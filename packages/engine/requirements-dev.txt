@@ -5,7 +5,7 @@
 -r requirements.txt
 
 # Testing Framework
-pytest>=7.4.0
+pytest>=7.4.4
 pytest-asyncio>=0.23.0
 pytest-cov>=4.1.0
 pytest-xdist>=3.5.0  # Parallel test execution

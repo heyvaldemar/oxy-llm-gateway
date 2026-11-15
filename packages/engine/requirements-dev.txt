@@ -19,7 +19,7 @@ respx>=0.20.0  # Mock httpx requests
 black>=24.0.0
 isort>=5.12.0
 mypy>=1.8.0
-ruff>=0.1.0
+ruff>=0.17.4
 
 # Type Stubs
 types-redis>=4.6.0

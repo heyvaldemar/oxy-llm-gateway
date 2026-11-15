@@ -11,7 +11,7 @@ pytest-cov>=4.1.0
 pytest-xdist>=3.5.0  # Parallel test execution
 
 # Mocking & Faking
-fakeredis>=2.20.0
+fakeredis>=2.40.0
 lupa==2.8  # lets fakeredis run the real Lua scripts in tests/test_request_path_security.py
 respx>=0.20.0  # Mock httpx requests
 

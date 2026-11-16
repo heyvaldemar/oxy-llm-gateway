@@ -282,6 +282,8 @@ Major versions are not proposed: each is a migration, made by hand in its own pu
 - engine: `anthropic` 2, `redis` 8, `stripe` 17, `structlog` 26 (and `redis` stays on 5.2: with 5.3, concurrent commands queue behind each timeout while Redis does not answer, and the fail-closed proof timed out), and for development `pytest` 9, `pytest-asyncio` 1, `pytest-cov` 7, `black` 26, `isort` 9, `mypy` 2;
 - UI: TypeScript 7, ESLint 10, Vite 8 with `@vitejs/plugin-react` 6, Vitest 5, jsdom 31, `@sentry/nextjs` 11, `framer-motion` 14, `lucide-react` 1, `sonner` 2, `@testing-library/jest-dom` 7, `@types/node` 26.
 
+`pnpm-workspace.yaml` lifts three build-time packages past their advisories until the packages that pull them in ship the fixes: `glob` 14 and `minimatch` 11 under `@sentry/nextjs` 10 (its bundler plugins) and typescript-eslint, and `webpack` 5.104.1 or later, the peer of Sentry's webpack plugin. None of them reaches the running services.
+
 ## License
 
 Apache License 2.0: [LICENSE](LICENSE) holds the license text unchanged, [NOTICE](NOTICE) the copyright.

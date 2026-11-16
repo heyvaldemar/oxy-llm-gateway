@@ -1,2 +1,9 @@
 packages:
   - 'packages/*'
+# Security fixes in build-time tooling, pulled in by @sentry/nextjs 10 (its
+# bundler plugins) and typescript-eslint; Sentry 11 moves to glob 14 itself.
+# Drop each line once the parent ships the fixed version.
+overrides:
+  'webpack@>=5.49.0 <5.104.1': ^5.104.1   # GHSA-8fgc-7cc6-rx7x, GHSA-38r7-794h-5758
+  'glob@>=9.0.0 <14.0.2': ^14.0.3          # GHSA-3g3m-2fjr-6pw4
+  'minimatch@>=7.0.0 <11.0.1': ^11.0.5     # GHSA-g3hv-75wg-m249

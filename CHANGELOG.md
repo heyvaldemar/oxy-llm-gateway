@@ -1,10 +1,25 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.5] - 2026-11-16
+
+The dashboard says what the engine does. Four of these changes are Tatiana Mikhaleva's pull requests (#32 to #35): a page that promised a monthly limit, alerts at other thresholds or a cap no tier has now says what the gateway enforces, and the API Keys page shows when a key was last used.
+
+### Added
+
+- The API Keys page shows when each key was last used (#33). Nothing wrote `api_keys.last_used_at` up to 1.0.4. The gateway now writes it in a background task the request does not wait for, at most once a minute per key (a Redis `SET NX` with a 60-second expiry), so a busy key costs one database write a minute. Created and Last used show in the reader's time zone. The smoke test requires the time to reach the page.
+
+### Changed
+
+- Every long-running service in both compose files comes back after a reboot or a crash (`restart: unless-stopped`), and Redis, and Postgres in the development stack, get 30 seconds to write their data out before Docker kills them, instead of the default 10 (#34).
+- The release workflow checks the exact signer: `release-assets.yml` on the ref the run ran on, not a prefix any workflow of the repository matches. Its changed-archive check requires each tool to refuse in its own words, so Sigstore out of reach or a missing tool no longer passes it, and a run started by hand runs from `main` only.
+- `pnpm-workspace.yaml` lifts glob to 14, minimatch to 11 and webpack to 5.112.2, past GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249, GHSA-8fgc-7cc6-rx7x and GHSA-38r7-794h-5758 (#37). All four sit in build-time tooling that `@sentry/nextjs` 10 and typescript-eslint pull in; none reaches the running services. minimatch 3.1.5, which the ESLint plugins need, is below its advisory's range and stays.
 
 ### Fixed
 
-- Budget alerts reach the organization's Slack, Discord and Zapier webhooks. `check_budget_and_alert`, which the request path calls, did not hand the organization to the function that sends, so that branch never ran for a real request; its test called the inner function directly and missed it. The 24-hour "already sent" mark for a threshold is now set only when a channel took the alert: the Slack and Discord call set it whatever happened, so a failed email could have kept that threshold quiet for a day. `tests/test_budget_alerts_notifications.py` covers the request path, the mark, and the post to the stored Slack webhook.
+- - Budget alerts reach the organization's Slack, Discord and Zapier webhooks. `check_budget_and_alert`, which the request path calls, did not hand the organization to the function that sends, so that branch never ran for a real request; its test called the inner function directly and missed it. The 24-hour "already sent" mark for a threshold is now set only when a channel took the alert: the Slack and Discord call set it whatever happened, so a failed email could have kept that threshold quiet for a day. `tests/test_budget_alerts_notifications.py` covers the request path, the mark, and the post to the stored Slack webhook. (#36)
+- A project's budget is its total spend, and the dashboard says so (#32). Project Settings, the Budget Oracle and the budget tooltip spoke of a monthly limit that resets; nothing resets it, and once it is spent requests answer 402 until it is raised.
+- The Budget Oracle promised alerts at 75, 90 and 100%; the engine sends them at 80, 95 and 100% of the budget (#35).
+- No plan tier caps requests since 1.0.1, yet a 429 opened a "Monthly request cap reached" notice and a "Budget Exceeded" toast (#35). A 429 is a rate limit and a spent budget answers 402: the notice and its component are gone, and the toast says to wait and try again. The Plan limits page, the landing's budget card and the screenshot list no longer name a request cap.
 
 ## [1.0.4] - 2026-11-16
 

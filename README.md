@@ -218,7 +218,7 @@ Every number in this table comes from one run: CI run [43776441730](https://gith
 - Frontend: Next.js 16 (App Router, Turbopack), TypeScript strict, supabase-js + `@supabase/ssr`, Radix UI primitives, Tailwind
 - Data: Postgres 16, PostgREST 12, GoTrue (Supabase Auth) v2
 - Infra: docker-compose, nginx (path adapter), Caddy for TLS
-- Tests: pytest (455 offline tests), Playwright + Vitest on the UI
+- Tests: pytest (464 offline tests), Playwright + Vitest on the UI
 
 ## Repository layout
 
@@ -243,7 +243,7 @@ oxy/
 ## Running the tests
 
 ```bash
-make test-core          # 455 offline unit tests, a few seconds
+make test-core          # 464 offline unit tests, a few seconds
 make test-integration   # requires a running engine + live external services
 ```
 

@@ -30,4 +30,4 @@ async def public_status():
     Liveness without authentication: the API process answers. It checks nothing
     else; GET /health reports Redis and the database as they are.
     """
-    return {"status": "operational", "version": "1.0.4"}
+    return {"status": "operational", "version": "1.0.5"}

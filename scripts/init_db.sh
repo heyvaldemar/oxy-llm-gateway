@@ -5,9 +5,13 @@
 # (pooled or direct URLs). Dangerous: wipes data.
 #
 # Usage:
-#   SUPABASE_URL="postgresql://..." sh scripts/init_db.sh --force "$SUPABASE_URL"
-#   # or interactively:
-#   sh scripts/init_db.sh
+#   OXY_DB_URL="postgresql://..." bash scripts/init_db.sh --force
+#   # or interactively (the URL is read without echo):
+#   bash scripts/init_db.sh
+#
+# The URL, and the password in it, stays off every command line: it comes from
+# OXY_DB_URL or the prompt, never as an argument, and reaches psql in the
+# container as PG* environment variables passed by name (docker run -e NAME).
 # ==============================================================================
 
 set -euo pipefail
@@ -36,13 +40,14 @@ for arg in "$@"; do
       FORCE=1
       ;;
     *)
-      # First non-flag argument is treated as DB URL
-      if [ -z "$DB_URL_RAW" ]; then
-        DB_URL_RAW="$arg"
-      fi
+      # A connection string as an argument would be on this script's command
+      # line, where any user of the machine reads it with ps.
+      log_error "Pass the connection string in OXY_DB_URL or at the prompt, not as an argument."
+      exit 1
       ;;
   esac
 done
+DB_URL_RAW="${OXY_DB_URL:-}"
 
 clear
 echo -e "${CYAN}${BOLD}"
@@ -140,9 +145,38 @@ echo -e "${BLUE}🚀 Launching Docker Container...${NC}"
 
 START_TIME=$(date +%s)
 
+# --- CONNECTION, OFF EVERY COMMAND LINE ---
+# libpq reads PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE and PGSSLMODE from
+# its environment, and docker passes each by name, so neither docker's nor
+# psql's command line carries the URL or its password. The parts of the URL are
+# percent-decoded as libpq would; query parameters other than sslmode are dropped.
+url_decode() { printf '%b' "${1//%/\\x}"; }
+rest="${DB_URL_SSL#*://}"
+if [[ "$rest" != *@* ]]; then
+  log_error "The connection string has no user and password (expected postgresql://user:password@host:port/db)."
+  exit 1
+fi
+creds="${rest%%@*}"
+hostpart="${rest#*@}"
+hostport="${hostpart%%/*}"
+dbquery="${hostpart#*/}"
+[[ "$hostpart" == */* ]] || dbquery="postgres"
+PGUSER="$(url_decode "${creds%%:*}")"
+PGPASSWORD="$(url_decode "${creds#*:}")"
+PGHOST="${hostport%%:*}"
+PGPORT=5432
+[[ "$hostport" == *:* ]] && PGPORT="${hostport##*:}"
+PGDATABASE="$(url_decode "${dbquery%%\?*}")"
+PGSSLMODE=require
+if [[ "$dbquery" == *sslmode=* ]]; then
+  PGSSLMODE="${dbquery##*sslmode=}"
+  PGSSLMODE="${PGSSLMODE%%&*}"
+fi
+export PGUSER PGPASSWORD PGHOST PGPORT PGDATABASE PGSSLMODE
+
 docker run --rm \
   -v "$(pwd)/db:/migrations" \
-  -e DB_URL="$DB_URL_SSL" \
+  -e PGUSER -e PGPASSWORD -e PGHOST -e PGPORT -e PGDATABASE -e PGSSLMODE \
   --dns 8.8.8.8 \
   --entrypoint /bin/sh \
   postgres:alpine \
@@ -154,13 +188,13 @@ docker run --rm \
     }
 
     print_status "🔥 Dropping & Recreating schema public..."
-    psql "$DB_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+    psql -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
 
     print_status "📜 Applying Golden Schema (schema.sql)..."
-    psql "$DB_URL" -v ON_ERROR_STOP=1 -f /migrations/schema.sql
+    psql -v ON_ERROR_STOP=1 -f /migrations/schema.sql
 
     print_status "🔄 Forcing PostgREST cache refresh (DDL cache buster)..."
-    psql "$DB_URL" -c "CREATE TABLE IF NOT EXISTS _cache_buster (id int); DROP TABLE _cache_buster;"
+    psql -c "CREATE TABLE IF NOT EXISTS _cache_buster (id int); DROP TABLE _cache_buster;"
     echo ""
   '
 

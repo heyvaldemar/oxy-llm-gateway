@@ -67,7 +67,7 @@ run_init_db_force() {
     echo "ERROR: SUPABASE_URL is not set. Export a Supabase connection string before running --force."
     return
   fi
-  if ! sh scripts/init_db.sh --force "$SUPABASE_URL"; then
+  if ! OXY_DB_URL="$SUPABASE_URL" bash scripts/init_db.sh --force; then
     echo "init_db.sh --force failed."
   fi
 }

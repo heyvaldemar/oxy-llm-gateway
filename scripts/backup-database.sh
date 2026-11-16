@@ -120,12 +120,15 @@ echo "S3 location: s3://$S3_BUCKET/$S3_PREFIX/$BACKUP_FILE"
 echo "Retention: $RETENTION_DAYS days"
 echo ""
 echo "To restore:"
-echo "  aws s3 cp s3://$S3_BUCKET/$S3_PREFIX/$BACKUP_FILE - | gunzip | psql \$DATABASE_URL"
+echo "  aws s3 cp s3://$S3_BUCKET/$S3_PREFIX/$BACKUP_FILE - | gunzip | psql"
+echo "  (psql connects with PGHOST, PGUSER, PGPASSWORD and PGDATABASE from the environment,"
+echo "   so the password is not on its command line)"
 echo "================================================"
 
 # Send notification (optional)
 if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-    curl -X POST "$SLACK_WEBHOOK_URL" \
+    # The webhook URL is its own credential: curl reads it on standard input.
+    printf 'url = "%s"\n' "$SLACK_WEBHOOK_URL" | curl -sS -X POST --config - \
         -H 'Content-Type: application/json' \
         -d "{\"text\":\"✅ Database backup completed: ${BACKUP_FILE} (${BACKUP_SIZE})\"}"
 fi

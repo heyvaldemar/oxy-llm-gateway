@@ -39,13 +39,16 @@ run "ANON_KEY=\$(docker compose config --format json | jq -r .services.ui.enviro
 run "curl -s -X POST localhost:8080/auth/v1/otp -H \"apikey: \$ANON_KEY\" -H 'Content-Type: application/json' -d '{\"email\":\"$EMAIL\"}'; echo"
 sleep 2
 run "LINK=\$(curl -s localhost:8025/api/v1/message/latest | jq -r .Text | grep -o 'http://[^ ]*/auth/v1/verify[^ ]*')"
-run "TOKEN=\$(curl -s -o /dev/null -w '%{redirect_url}' \"\$LINK\" | grep -o 'access_token=[^&]*' | cut -d= -f2)"
+note "The link and the tokens reach curl on its standard input (--config -), never on its command line, where ps shows them."
+run "TOKEN=\$(printf 'url = \"%s\"\\n' \"\$LINK\" | curl -s --config - -o /dev/null -w '%{redirect_url}' | grep -o 'access_token=[^&]*' | cut -d= -f2)"
 run "echo \"signed in, session \${TOKEN:0:12}...\""
 
 note "Onboarding makes an organization, a project and an Oxy API key."
-run "OXY_API_KEY=\$(curl -s -X POST localhost:8000/management/onboard -H \"Authorization: Bearer \$TOKEN\" -H 'X-CSRF-Token: demo' -b csrf_token=demo -H 'Content-Type: application/json' -d '{\"full_name\":\"You\",\"email\":\"$EMAIL\"}' | jq -r .api_key)"
+run "as_user() { printf 'header = \"Authorization: Bearer %s\"\\n' \"\$TOKEN\" | curl --config - \"\$@\"; }"
+run "OXY_API_KEY=\$(as_user -s -X POST localhost:8000/management/onboard -H 'X-CSRF-Token: demo' -b csrf_token=demo -H 'Content-Type: application/json' -d '{\"full_name\":\"You\",\"email\":\"$EMAIL\"}' | jq -r .api_key)"
 run "echo \"Oxy API key \${OXY_API_KEY:0:13}...\""
 
 note "A request through the gateway, to its built-in healthcheck model (no provider key needed)."
-run "curl -s localhost:8000/v1/chat/completions -H \"Authorization: Bearer \$OXY_API_KEY\" -H 'Content-Type: application/json' -d '{\"model\":\"gpt-4.1-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a healthcheck bot for the Oxy Gateway.\"},{\"role\":\"user\",\"content\":\"ping\"}]}' | jq -r '.choices[0].message.content'"
+run "oxy() { printf 'header = \"Authorization: Bearer %s\"\\n' \"\$OXY_API_KEY\" | curl --config - \"\$@\"; }"
+run "oxy -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"gpt-4.1-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a healthcheck bot for the Oxy Gateway.\"},{\"role\":\"user\",\"content\":\"ping\"}]}' | jq -r '.choices[0].message.content'"
 sleep 3

@@ -29,8 +29,9 @@ payload=$(cat <<'JSON'
 JSON
 )
 
-response=$(curl -s -X POST "${API_URL}/v1/chat/completions" \
-  -H "Authorization: Bearer ${OXY_API_KEY}" \
+# The key reaches curl on standard input (--config -), not on its command line.
+response=$(printf 'header = "Authorization: Bearer %s"\n' "${OXY_API_KEY}" | curl -s -X POST "${API_URL}/v1/chat/completions" \
+  --config - \
   -H "Content-Type: application/json" \
   -d "${payload}")
 

@@ -13,7 +13,7 @@ SUPABASE_URL="${SUPABASE_URL:-postgresql://postgres.USER:password@aws-1-us-east-
 
 echo "🧨 Re-initializing Supabase schema from Golden Schema..."
 echo "   Using SUPABASE_URL=${SUPABASE_URL}"
-sh scripts/init_db.sh --force "$SUPABASE_URL"
+OXY_DB_URL="$SUPABASE_URL" bash scripts/init_db.sh --force
 
 echo "🧪 Running engine tests..."
 sh scripts/test_core.sh

@@ -38,7 +38,7 @@ Practical checklist for core contributors.
   - `docker compose down -v && docker compose up -d postgres` — wipes the volume and re-applies `db/supabase-compat.sql` + `db/schema.sql` cleanly.
   - `make test-core` — verifies offline business logic still passes.
 - Changed DB schema (hosted Supabase)?
-  - `SUPABASE_URL="postgresql://..." sh scripts/init_db.sh --force "$SUPABASE_URL"` — DANGER: wipes the public schema.
+  - `OXY_DB_URL="postgresql://..." bash scripts/init_db.sh --force` — DANGER: wipes the public schema.
   - `make test-core`
 - Refactored engine logic?
   - `make test-core` — 258 offline tests, sub-second on M-series Macs.
@@ -88,7 +88,7 @@ Practical checklist for core contributors.
   Expect assistant content: `pong from Oxy Gateway`.
 
 ## Scripts & targets
-- DB reset: `sh scripts/init_db.sh --force "$SUPABASE_URL"` (DANGER: wipes public)
+- DB reset: `OXY_DB_URL="$SUPABASE_URL" bash scripts/init_db.sh --force` (DANGER: wipes public)
 - Core tests: `make test-core` or `sh scripts/test_core.sh`
 - Full sanity (reset + tests + smoke): `make dev-full`
 - Quick check (tests + smoke, no DB reset): `make dev-quick`

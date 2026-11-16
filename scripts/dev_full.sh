@@ -12,7 +12,9 @@ cd "$(dirname "$0")/.."
 SUPABASE_URL="${SUPABASE_URL:-postgresql://postgres.USER:password@aws-1-us-east-1.pooler.supabase.com:6543/postgres}"
 
 echo "🧨 Re-initializing Supabase schema from Golden Schema..."
-echo "   Using SUPABASE_URL=${SUPABASE_URL}"
+# The database, not the URL: the URL carries the password.
+. scripts/db_url_env.sh
+echo "   Using the database at $(db_url_display "$SUPABASE_URL")"
 OXY_DB_URL="$SUPABASE_URL" bash scripts/init_db.sh --force
 
 echo "🧪 Running engine tests..."

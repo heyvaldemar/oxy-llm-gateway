@@ -148,31 +148,11 @@ START_TIME=$(date +%s)
 # --- CONNECTION, OFF EVERY COMMAND LINE ---
 # libpq reads PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE and PGSSLMODE from
 # its environment, and docker passes each by name, so neither docker's nor
-# psql's command line carries the URL or its password. The parts of the URL are
-# percent-decoded as libpq would; query parameters other than sslmode are dropped.
-url_decode() { printf '%b' "${1//%/\\x}"; }
-rest="${DB_URL_SSL#*://}"
-if [[ "$rest" != *@* ]]; then
-  log_error "The connection string has no user and password (expected postgresql://user:password@host:port/db)."
-  exit 1
-fi
-creds="${rest%%@*}"
-hostpart="${rest#*@}"
-hostport="${hostpart%%/*}"
-dbquery="${hostpart#*/}"
-[[ "$hostpart" == */* ]] || dbquery="postgres"
-PGUSER="$(url_decode "${creds%%:*}")"
-PGPASSWORD="$(url_decode "${creds#*:}")"
-PGHOST="${hostport%%:*}"
-PGPORT=5432
-[[ "$hostport" == *:* ]] && PGPORT="${hostport##*:}"
-PGDATABASE="$(url_decode "${dbquery%%\?*}")"
-PGSSLMODE=require
-if [[ "$dbquery" == *sslmode=* ]]; then
-  PGSSLMODE="${dbquery##*sslmode=}"
-  PGSSLMODE="${PGSSLMODE%%&*}"
-fi
-export PGUSER PGPASSWORD PGHOST PGPORT PGDATABASE PGSSLMODE
+# psql's command line carries the URL or its password (scripts/db_url_env.sh,
+# tested by scripts/test_db_url_env.sh).
+# shellcheck source=scripts/db_url_env.sh
+. "$(dirname "$0")/db_url_env.sh"
+db_url_to_pg_env "$DB_URL_SSL" || exit 1
 
 docker run --rm \
   -v "$(pwd)/db:/migrations" \

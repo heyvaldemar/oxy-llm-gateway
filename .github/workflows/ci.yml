@@ -48,6 +48,9 @@ jobs:
       - name: Offline tests
         run: sh scripts/test_core.sh
 
+      - name: The scripts' connection-string parser
+        run: bash scripts/test_db_url_env.sh
+
       - name: Known vulnerabilities in pinned dependencies
         run: |
           pip install pip-audit

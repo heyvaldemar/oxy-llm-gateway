@@ -117,7 +117,9 @@ async def _fetch_channel_settings(org_id: str) -> Dict[str, Any]:
         return {}
 
 
-async def send_slack_discord_alert(org_id: str, text: str) -> None:
+async def send_slack_discord_alert(org_id: str, text: str) -> bool:
+    """Post to the organization's enabled Slack and Discord webhooks; True when
+    at least one of them accepted the message."""
     settings = await _fetch_channel_settings(org_id)
     slack_url = settings.get("slack_webhook_url") if settings.get("slack_enabled") else None
     discord_url = settings.get("discord_webhook_url") if settings.get("discord_enabled") else None
@@ -128,9 +130,11 @@ async def send_slack_discord_alert(org_id: str, text: str) -> None:
     if discord_url and any(discord_url.startswith(p) for p in DISCORD_PREFIXES):
         notifiers.append(DiscordNotifier(discord_url))
 
+    delivered = False
     for notifier in notifiers:
         try:
-            await notifier.send(text)
+            delivered = bool(await notifier.send(text)) or delivered
         except Exception as exc:
             # Best-effort: log, do not raise
             log.error("notify_channel_send_failed", org_id=org_id, channel=notifier.__class__.__name__, error=str(exc)[:200])
+    return delivered

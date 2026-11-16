@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Budget alerts reach the organization's Slack, Discord and Zapier webhooks. `check_budget_and_alert`, which the request path calls, did not hand the organization to the function that sends, so that branch never ran for a real request; its test called the inner function directly and missed it. The 24-hour "already sent" mark for a threshold is now set only when a channel took the alert: the Slack and Discord call set it whatever happened, so a failed email could have kept that threshold quiet for a day. `tests/test_budget_alerts_notifications.py` covers the request path, the mark, and the post to the stored Slack webhook.
+
 ## [1.0.4] - 2026-11-16
 
 No secret on a command line. A gateway that sells DLP and an audit trail kept its own Redis password and vault key where any user of the host could read them with `ps`. Found by the fleet's conformance check.

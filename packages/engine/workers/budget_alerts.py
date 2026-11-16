@@ -98,7 +98,8 @@ async def check_budget_and_alert(
                 threshold=threshold,
                 current_spend=current_spend,
                 budget_limit=budget_limit,
-                percentage=percentage
+                percentage=percentage,
+                organization_id=organization_id,
             )
 
 
@@ -193,8 +194,8 @@ async def send_budget_alert_if_needed(
                 f"[Budget Alert] Project {project_name} reached {int(percentage)}% of its budget "
                 f"(${float(current_spend):.2f}/${float(budget_limit):.2f}) at threshold {threshold}%."
             )
-            await send_slack_discord_alert(organization_id, text)
-            channel_sent = True
+            sent = await send_slack_discord_alert(organization_id, text)
+            channel_sent = channel_sent or bool(sent)
         except Exception as exc:
             log.error("budget_alert_slack_discord_failed", project_id=project_id, org_id=organization_id, error=str(exc)[:200])
 

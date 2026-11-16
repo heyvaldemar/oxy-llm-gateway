@@ -31,7 +31,7 @@ docker compose up -d --build --wait
 
 ![From a clean clone to "pong": docker compose up, a magic link through Mailpit, an Oxy API key, a request through the gateway](docs/walkthrough.gif)
 
-The terminal recording comes from Walkthrough run [43744856761](https://github.com/heyvaldemar/oxy-llm-gateway/actions/runs/43744856761) on 2026-11-15, on the repository's first commit (`1ca8295`; the script and the routes it calls are unchanged since): [`.github/workflows/walkthrough.yml`](.github/workflows/walkthrough.yml) ran [`scripts/walkthrough.sh`](scripts/walkthrough.sh) under asciinema on a clean GitHub runner, and the script prints every command and runs it as printed. That run's cast is [`docs/walkthrough.cast`](docs/walkthrough.cast) (`asciinema play docs/walkthrough.cast`); the GIF was rendered from it afterwards with agg, outside CI, with the build output hidden and at double speed.
+The terminal recording comes from Walkthrough run [43813025035](https://github.com/heyvaldemar/oxy-llm-gateway/actions/runs/43813025035) on 2026-11-16, with the script as of `6add5aa` (the magic link, the session token and the API key reach curl on its standard input): [`.github/workflows/walkthrough.yml`](.github/workflows/walkthrough.yml) ran [`scripts/walkthrough.sh`](scripts/walkthrough.sh) under asciinema on a clean GitHub runner, and the script prints every command and runs it as printed. That run's cast is [`docs/walkthrough.cast`](docs/walkthrough.cast) (`asciinema play docs/walkthrough.cast`); the GIF was rendered from it afterwards, outside CI, with `agg --speed 2` (the script hides the build output).
 
 The first build takes a few minutes. No `.env` file, cloud account or provider key is needed to start. Then:
 

@@ -9,7 +9,6 @@ Architecture Pattern: Strategy Pattern + Adapter Pattern
 - Adapter: Convert OpenAI-format requests to provider-specific format
 """
 
-import hashlib
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, Any, Optional, List
 from decimal import Decimal
@@ -257,9 +256,9 @@ class ProviderRegistry:
         self._provider_classes: Dict[str, type[LLMProvider]] = {}
         # Instances installed by hand (tests, a host application), by provider name.
         self._provider_instances: Dict[str, LLMProvider] = {}
-        # Instances the registry built, by provider name and a digest of the API
-        # key: an instance holds the key it was built with, so one per name made
-        # every organization's request leave with the first organization's key.
+        # Instances the registry built, by provider name and API key: an instance
+        # holds the key it was built with, so one per name made every
+        # organization's request leave with the first organization's key.
         self._keyed_instances: Dict[tuple, LLMProvider] = {}
         self._model_to_provider: Dict[str, str] = {}
         # Initialize logger to prevent AttributeError
@@ -325,7 +324,8 @@ class ProviderRegistry:
             return self._provider_instances[provider_name]
 
         # Lazy-instantiate provider, one per provider name and API key.
-        cache_key = (provider_name, hashlib.sha256((api_key or "").encode()).hexdigest())
+        # (The instance holds the key itself, so keying by it exposes nothing more.)
+        cache_key = (provider_name, api_key or "")
         instance = self._keyed_instances.get(cache_key)
         if instance is None:
             if len(self._keyed_instances) >= self.MAX_KEYED_INSTANCES:

@@ -250,16 +250,10 @@ class ProviderRegistry:
         response = await provider.complete(model="gpt-4", messages=[...])
     """
     
-    MAX_KEYED_INSTANCES = 256
-
     def __init__(self):
         self._provider_classes: Dict[str, type[LLMProvider]] = {}
         # Instances installed by hand (tests, a host application), by provider name.
         self._provider_instances: Dict[str, LLMProvider] = {}
-        # Instances the registry built, by provider name, then API key: an instance
-        # holds the key it was built with, so one per name made every
-        # organization's request leave with the first organization's key.
-        self._keyed_instances: Dict[str, Dict[str, LLMProvider]] = {}
         self._model_to_provider: Dict[str, str] = {}
         # Initialize logger to prevent AttributeError
         self.log = structlog.get_logger().bind(component="provider_registry")
@@ -323,23 +317,16 @@ class ProviderRegistry:
         if provider_name in self._provider_instances:
             return self._provider_instances[provider_name]
 
-        # Lazy-instantiate provider, one per provider name and API key. The key
-        # is only ever the dict key of a per-provider mapping and the `api_key`
-        # argument: no other local variable holds it, so an error reporter that
-        # captures locals and filters them by name (it filters `api_key`) sees
-        # nothing it would not have seen before.
-        by_key = self._keyed_instances.setdefault(provider_name, {})
-        instance = by_key.get(api_key or "")
-        if instance is None:
-            if len(by_key) >= self.MAX_KEYED_INSTANCES:
-                by_key.pop(next(iter(by_key)))
-            provider_class = self._provider_classes[provider_name]
-            instance = by_key[api_key or ""] = provider_class(
-                api_key=api_key,
-                http_client=http_client,
-                provider_name=provider_name
-            )
-        return instance
+        # One instance per call. An instance holds the API key it was built with,
+        # and the key differs by organization: an instance cached per provider
+        # name made every organization's request leave with the first one's key.
+        # Constructors only set attributes (the HTTP client is shared), so there
+        # is nothing worth caching, and no secret outlives the request in a cache.
+        return self._provider_classes[provider_name](
+            api_key=api_key,
+            http_client=http_client,
+            provider_name=provider_name
+        )
     
     def get_provider_name_for_model(self, model: str) -> str:
         """

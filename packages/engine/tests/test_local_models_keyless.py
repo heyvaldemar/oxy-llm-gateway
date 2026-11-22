@@ -95,18 +95,17 @@ def test_each_organizations_key_reaches_its_own_provider_instance():
     client = httpx.AsyncClient()
     a = provider_registry.get_provider_for_model("vllm/m", "key-of-organization-A", client)
     b = provider_registry.get_provider_for_model("vllm/m", "key-of-organization-B", client)
-    assert (a.api_key, b.api_key) == ("key-of-organization-A", "key-of-organization-B")
-    assert provider_registry.get_provider_for_model("vllm/m", "key-of-organization-A", client) is a
+    again = provider_registry.get_provider_for_model("vllm/m", "key-of-organization-A", client)
+    assert (a.api_key, b.api_key, again.api_key) == ("key-of-organization-A", "key-of-organization-B", "key-of-organization-A")
 
 
-def test_the_registry_keeps_a_bounded_number_of_instances():
+def test_the_registry_keeps_no_key_after_the_call():
     from providers.base import ProviderRegistry
     registry = ProviderRegistry()
     registry.register("vllm", local_provider.VLLMProvider, model_prefixes=["vllm/"])
-    client = httpx.AsyncClient()
-    for i in range(registry.MAX_KEYED_INSTANCES + 50):
-        registry.get_provider_for_model("vllm/m", "key-%d" % i, client)
-    assert len(registry._keyed_instances["vllm"]) == registry.MAX_KEYED_INSTANCES
+    registry.get_provider_for_model("vllm/m", "key-that-must-not-be-kept", httpx.AsyncClient())
+    held = repr(vars(registry)) + repr([vars(x) for x in registry._provider_instances.values()])
+    assert "key-that-must-not-be-kept" not in held
 
 
 def test_a_local_model_bills_nothing_unless_the_operator_prices_it(monkeypatch):
@@ -124,7 +123,6 @@ def test_a_local_model_bills_nothing_unless_the_operator_prices_it(monkeypatch):
 
 def test_local_slash_uses_the_configured_endpoint(monkeypatch):
     monkeypatch.setenv("LOCAL_HTTP_BASE_URL", "http://gpu-box:9000")
-    provider_registry._keyed_instances.clear()
     provider = provider_registry.get_provider_for_model("local/m", NO_KEY_PLACEHOLDER, httpx.AsyncClient())
     assert provider.base_url == "http://gpu-box:9000"
 
@@ -168,7 +166,6 @@ def gateway(monkeypatch, key_lookup):
     monkeypatch.setattr(resources, "redis", Redis())
     monkeypatch.setattr(resources, "supabase", None)  # the organization's status then reads as active
     monkeypatch.setattr(local_provider, "VLLM_BASE_URL", "http://vllm.test:8000")
-    provider_registry._keyed_instances.clear()
     app = FastAPI()
     app.include_router(p.router)
     return SimpleNamespace(client=TestClient(app, raise_server_exceptions=False), rows=rows, http=key_lookup)

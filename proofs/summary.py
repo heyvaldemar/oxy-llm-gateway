@@ -30,6 +30,12 @@ def rows(r, plants):
         k = r["kill"]
         rows.append(("kill", "Kill switch", "%s requests after the kill, %s reached the provider; first blocked response %s ms after the call"
                      % (k.get("requests_after_kill"), k.get("reached_provider_after_kill"), k.get("first_blocked_response_ms")), k["ok"]))
+    if "local" in r:
+        l = r["local"]
+        rows.append(("local", "Local model", "%s requests for %s, budget $%s: the server served %s (the budget buys %s), overspend $%s; %s secret types sent, %s reached the server; %s requests after the kill, %s reached it"
+                     % (l.get("requests"), l.get("model"), l.get("budget_usd"), l.get("served_by_server"), l.get("max_affordable"),
+                        l.get("overspend_usd"), (l.get("dlp") or {}).get("secret_types"), (l.get("dlp") or {}).get("reached_server"),
+                        len((l.get("kill") or {}).get("statuses_after") or []), (l.get("kill") or {}).get("reached_server_after_kill")), l["ok"]))
     if "tenancy" in r:
         t = r["tenancy"]
         rows.append(("tenancy", "Tenancy", "%s requests with another tenant's agent and session ids: %s refused, %s reached the provider"

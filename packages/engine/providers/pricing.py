@@ -12,7 +12,8 @@ Pricing data sources:
 Last updated: November 2025
 """
 
-from decimal import Decimal
+import os
+from decimal import Decimal, InvalidOperation
 from typing import Dict, Optional
 import structlog
 
@@ -333,6 +334,13 @@ class PricingEngine:
         if model in cls.PRICING_TABLE:
             return cls.PRICING_TABLE[model]
         
+        # A model served by the operator's own hardware bills nothing per token
+        # unless the operator says what a million tokens cost them (for example
+        # the GPU's amortized cost), so a budget can still cap a local model.
+        from .local_provider import is_local_model
+        if is_local_model(model):
+            return cls.local_pricing()
+        
         # Log unknown model for monitoring
         log.warning(
             "unknown_model_pricing",
@@ -344,6 +352,20 @@ class PricingEngine:
         
         return cls.DEFAULT_PRICING
     
+    @staticmethod
+    def local_pricing() -> Dict[str, Decimal]:
+        """Per-million-token price of a local model: LOCAL_PROMPT_PRICE_PER_MILLION and
+        LOCAL_COMPLETION_PRICE_PER_MILLION in USD, 0 when unset or not a number."""
+        def price(name: str) -> Decimal:
+            try:
+                return max(Decimal(os.getenv(name, "0").strip() or "0"), Decimal("0"))
+            except InvalidOperation:
+                return Decimal("0")
+        return {
+            "prompt_tokens_per_million": price("LOCAL_PROMPT_PRICE_PER_MILLION"),
+            "completion_tokens_per_million": price("LOCAL_COMPLETION_PRICE_PER_MILLION"),
+        }
+
     @classmethod
     def calculate_cost(
         cls,

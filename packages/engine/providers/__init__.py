@@ -37,6 +37,7 @@ from .local_provider import (
     OllamaProvider, 
     VLLMProvider, 
     DockerModelRunnerProvider,
+    LocalEndpointProvider,
     get_local_provider,
     is_local_model
 )
@@ -70,8 +71,8 @@ provider_registry.register("docker", DockerModelRunnerProvider, model_prefixes=[
     "docker/"
 ])
 
-# Generic local prefix (falls back to Ollama)
-provider_registry.register("local", OllamaProvider, model_prefixes=[
+# Generic local prefix: LOCAL_HTTP_BASE_URL, Ollama's address when unset
+provider_registry.register("local", LocalEndpointProvider, model_prefixes=[
     "local/"
 ])
 
@@ -98,6 +99,7 @@ __all__ = [
     
     # Local Providers (AGENT SUPPORT)
     "OllamaProvider",
+    "LocalEndpointProvider",
     "VLLMProvider",
     "DockerModelRunnerProvider",
     "get_local_provider",

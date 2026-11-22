@@ -13,6 +13,10 @@ Proofs: what Oxy claims, measured against a recording fake provider.
             No request started after the kill returns reaches the provider; the
             time to the first blocked response is measured. The session's row
             records the kill: who, when and why.
+  local     A local model (vllm/...) gets the same gateway as a hosted one: served by
+            the fake with no provider key anywhere, capped by a budget at the
+            operator's price per million tokens, a secret in it never reaches the
+            server, and a killed session's next request does not either.
   tenancy   Another tenant sends requests carrying this tenant's agent and session
             ids. All are refused; none reaches the provider or lands on this
             tenant's agent.
@@ -64,6 +68,13 @@ API = "http://localhost:8000"
 SUPA = "http://localhost:8080"
 FAKE = "http://127.0.0.1:9000"
 MODEL = "gpt-4o-mini"
+
+LOCAL_MODEL = "vllm/proof-model"  # served by the same fake, with no provider key anywhere
+LOCAL_BUDGET_USD = Decimal("0.02")
+LOCAL_REQUESTS = 12
+# One fake completion (1500 prompt + 2000 completion tokens) at the proofs overlay's
+# LOCAL_PROMPT_PRICE_PER_MILLION=1.00 and LOCAL_COMPLETION_PRICE_PER_MILLION=2.00.
+LOCAL_UNIT_USD = Decimal("0.0055")
 
 BUDGET_USD = Decimal("0.05")
 BUDGET_REQUESTS = 500
@@ -152,13 +163,13 @@ class Tenant:
         self.sent = 0
         self._lock = threading.Lock()
 
-    def chat(self, content, extra_headers=None, key=None, counted=True):
+    def chat(self, content, extra_headers=None, key=None, counted=True, model=None):
         """One completion request. counted: it belongs to this tenant's audit trail."""
         if counted:
             with self._lock:
                 self.sent += 1
         st, body, _ = http("POST", API + "/v1/chat/completions",
-                           {"model": MODEL, "messages": [{"role": "user", "content": content}]},
+                           {"model": model or MODEL, "messages": [{"role": "user", "content": content}]},
                            {"Authorization": "Bearer " + (key or self.key), **(extra_headers or {})})
         return st, body
 
@@ -364,6 +375,56 @@ def proof_kill(results, tenants):
         "reached_provider_after_kill": after, "requests_after_kill": sum(1 for s0, _, _ in log if s0 > kill_done),
         "answered_200_after_kill": late_ok, "row_records_the_kill": row_records_the_kill,
         "statuses": {str(k): sum(1 for _, _, s1 in log if s1 == k) for k in sorted({s1 for _, _, s1 in log})},
+    }
+
+
+def proof_local(results, tenants):
+    """A local model gets the same gateway as a hosted one. Requests for vllm/... reach the fake
+    with no provider key configured (the prefix is the gateway's, not the server's); a budget
+    caps them at the operator's price per million tokens; a secret in one never reaches the
+    server; a killed session's next request does not either."""
+    t = Tenant("local", LOCAL_BUDGET_USD)
+    tenants.append(t)
+    fake_reset()
+    statuses = [t.chat("[proof:local:budget:%d] ping" % i, model=LOCAL_MODEL)[0] for i in range(LOCAL_REQUESTS)]
+    served_rows = tagged(fake_requests(), "[proof:local:budget:")
+    served = len(served_rows)
+    models_sent = sorted({r["body"].get("model") for r, _ in served_rows})
+    spent = LOCAL_UNIT_USD * served
+    overspend = max(Decimal(0), spent - LOCAL_BUDGET_USD)
+    counts = {str(c): statuses.count(c) for c in sorted(set(statuses))}
+
+    d = Tenant("local_dlp", Decimal("0"))
+    tenants.append(d)
+    secrets = synthetic_secrets()
+    dlp_statuses = {name: d.chat("[proof:local:dlp:%s] keep this safe: %s" % (name, value), model=LOCAL_MODEL)[0]
+                    for name, value in secrets.items()}
+    control_status, _ = d.chat("[proof:local:dlp:control] nothing secret here", model=LOCAL_MODEL)
+    bodies = json.dumps(fake_requests())
+    reached = [name for name, value in secrets.items() if value in bodies or value.replace("\n", "\\n") in bodies]
+
+    k = Tenant("local_kill", Decimal("0"))
+    tenants.append(k)
+    agent_id, session_id = k.agent_session()
+    headers = {"X-Oxy-Agent-Id": agent_id, "X-Oxy-Session-Id": session_id}
+    before_status, _ = k.chat("[proof:local:kill:before] step", headers, model=LOCAL_MODEL)
+    kill_status, _, _ = http("POST", "%s/v1/agent-sessions/%s/kill" % (API, session_id), None, {"Authorization": "Bearer " + k.key})
+    after = [k.chat("[proof:local:kill:after:%d] step" % i, headers, model=LOCAL_MODEL)[0] for i in range(5)]
+    reached_after_kill = len(tagged(fake_requests(), "[proof:local:kill:after:"))
+
+    ok = (served >= 1 and served == statuses.count(200) and counts.get("402", 0) >= 1 and overspend == 0
+          and models_sent == ["proof-model"]
+          and not reached and all(st == 451 for st in dlp_statuses.values()) and control_status == 200
+          and before_status == 200 and kill_status == 200 and all(st == 410 for st in after) and reached_after_kill == 0)
+    results["local"] = {
+        "ok": ok, "model": LOCAL_MODEL, "model_sent_to_server": models_sent,
+        "budget_usd": str(LOCAL_BUDGET_USD), "unit_cost_usd": str(LOCAL_UNIT_USD), "requests": len(statuses),
+        "served_by_server": served, "max_affordable": int(LOCAL_BUDGET_USD / LOCAL_UNIT_USD), "spent_usd": str(spent),
+        "overspend_usd": str(overspend), "statuses": counts,
+        "dlp": {"secret_types": len(secrets), "refused_451": sum(1 for st in dlp_statuses.values() if st == 451),
+                "reached_server": len(reached), "control_request_status": control_status},
+        "kill": {"before_status": before_status, "kill_status": kill_status, "statuses_after": after,
+                 "reached_server_after_kill": reached_after_kill},
     }
 
 
@@ -629,9 +690,9 @@ def proof_audit(results, tenants):
                         "per_proof": {t.label: t.sent for t in tenants}}
 
 
-PROOFS = {"budget": proof_budget, "dlp": proof_dlp, "kill": proof_kill, "tenancy": proof_tenancy,
+PROOFS = {"budget": proof_budget, "dlp": proof_dlp, "kill": proof_kill, "local": proof_local, "tenancy": proof_tenancy,
           "revoke": proof_revoke, "failclosed": proof_failclosed, "surface": proof_surface, "keys": proof_keys}
-ORDER = ["budget", "dlp", "kill", "tenancy", "revoke", "failclosed", "surface", "keys", "audit"]
+ORDER = ["budget", "dlp", "kill", "local", "tenancy", "revoke", "failclosed", "surface", "keys", "audit"]
 
 
 def main():

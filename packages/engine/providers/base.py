@@ -9,6 +9,7 @@ Architecture Pattern: Strategy Pattern + Adapter Pattern
 - Adapter: Convert OpenAI-format requests to provider-specific format
 """
 
+import hashlib
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, Any, Optional, List
 from decimal import Decimal
@@ -250,9 +251,16 @@ class ProviderRegistry:
         response = await provider.complete(model="gpt-4", messages=[...])
     """
     
+    MAX_KEYED_INSTANCES = 256
+
     def __init__(self):
         self._provider_classes: Dict[str, type[LLMProvider]] = {}
+        # Instances installed by hand (tests, a host application), by provider name.
         self._provider_instances: Dict[str, LLMProvider] = {}
+        # Instances the registry built, by provider name and a digest of the API
+        # key: an instance holds the key it was built with, so one per name made
+        # every organization's request leave with the first organization's key.
+        self._keyed_instances: Dict[tuple, LLMProvider] = {}
         self._model_to_provider: Dict[str, str] = {}
         # Initialize logger to prevent AttributeError
         self.log = structlog.get_logger().bind(component="provider_registry")
@@ -313,16 +321,22 @@ class ProviderRegistry:
                 f"Available providers: {list(self._provider_classes.keys())}"
             )
         
-        # Lazy-instantiate provider (cache per provider_name)
-        if provider_name not in self._provider_instances:
+        if provider_name in self._provider_instances:
+            return self._provider_instances[provider_name]
+
+        # Lazy-instantiate provider, one per provider name and API key.
+        cache_key = (provider_name, hashlib.sha256((api_key or "").encode()).hexdigest())
+        instance = self._keyed_instances.get(cache_key)
+        if instance is None:
+            if len(self._keyed_instances) >= self.MAX_KEYED_INSTANCES:
+                self._keyed_instances.pop(next(iter(self._keyed_instances)))
             provider_class = self._provider_classes[provider_name]
-            self._provider_instances[provider_name] = provider_class(
+            instance = self._keyed_instances[cache_key] = provider_class(
                 api_key=api_key,
                 http_client=http_client,
                 provider_name=provider_name
             )
-        
-        return self._provider_instances[provider_name]
+        return instance
     
     def get_provider_name_for_model(self, model: str) -> str:
         """

@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Local models are reachable. A request for `vllm/<name>`, `ollama/<name>`, `docker/<name>` or `local/<name>` answered 400 "Provider not configured" for want of a provider key the model never needed, so the adapters in `providers/` could not be reached from the gateway. A local provider now takes the organization's key if there is one, else `<NAME>_API_KEY`, else none, and a server started with its own key is sent it as a bearer token. `local/<name>` goes to `LOCAL_HTTP_BASE_URL` (Ollama's address when unset). A local model bills nothing per token unless `LOCAL_PROMPT_PRICE_PER_MILLION` and `LOCAL_COMPLETION_PRICE_PER_MILLION` say what a million tokens cost the operator; with them set, a project's budget caps it like a hosted model (`tests/test_local_models_keyless.py`).
+- A proof for it, **local**, and two planted violations (`local_key`, `local_price`): requests for `vllm/...` are served by the recording fake with no provider key anywhere, a $0.02 budget buys exactly three at the configured price, none of eleven secret types sent to a local model reaches the server, and a killed session's next requests do not either.
+
+### Fixed
+
+- Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now keeps one instance per provider and key, at most 256 of them.
+
 ## [1.0.6] - 2026-11-22
 
 Four defects that running the lab and reading the answers found, and three more of the same shape that fixing them turned up. Each has a test that fails on 1.0.5; the kill proof gained a check and a planted violation of its own.

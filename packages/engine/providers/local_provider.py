@@ -40,6 +40,18 @@ import structlog
 
 from .base import LLMProvider
 
+# Routes/proxy.py hands a local model this placeholder when no key is configured.
+NO_KEY_PLACEHOLDER = "no-key-local-model"
+
+
+def _auth_headers(api_key: Optional[str]) -> Dict[str, str]:
+    """No Authorization header for a local server that was given no key; a bearer one for a
+    server started with its own (vLLM's --api-key)."""
+    if not api_key or api_key == NO_KEY_PLACEHOLDER:
+        return {}
+    return {"Authorization": f"Bearer {api_key}"}
+
+
 log = structlog.get_logger()
 
 
@@ -159,6 +171,7 @@ class OllamaProvider(LLMProvider):
             response = await self.http_client.post(
                 url,
                 json=payload,
+                headers=_auth_headers(self.api_key),
                 timeout=LOCAL_MODEL_TIMEOUT
             )
             
@@ -232,7 +245,8 @@ class OllamaProvider(LLMProvider):
             async with self.http_client.stream(
                 "POST", 
                 url, 
-                json=payload, 
+                json=payload,
+                headers=_auth_headers(self.api_key),
                 timeout=LOCAL_MODEL_TIMEOUT
             ) as response:
                 response.raise_for_status()
@@ -368,6 +382,7 @@ class VLLMProvider(LLMProvider):
             response = await self.http_client.post(
                 url,
                 json=payload,
+                headers=_auth_headers(self.api_key),
                 timeout=LOCAL_MODEL_TIMEOUT
             )
             response.raise_for_status()
@@ -417,7 +432,8 @@ class VLLMProvider(LLMProvider):
             async with self.http_client.stream(
                 "POST", 
                 url, 
-                json=payload, 
+                json=payload,
+                headers=_auth_headers(self.api_key),
                 timeout=LOCAL_MODEL_TIMEOUT
             ) as response:
                 response.raise_for_status()
@@ -535,6 +551,7 @@ class DockerModelRunnerProvider(LLMProvider):
             response = await self.http_client.post(
                 url,
                 json=payload,
+                headers=_auth_headers(self.api_key),
                 timeout=LOCAL_MODEL_TIMEOUT
             )
             response.raise_for_status()
@@ -565,7 +582,8 @@ class DockerModelRunnerProvider(LLMProvider):
         async with self.http_client.stream(
             "POST", 
             url, 
-            json=payload, 
+            json=payload,
+            headers=_auth_headers(self.api_key),
             timeout=LOCAL_MODEL_TIMEOUT
         ) as response:
             response.raise_for_status()
@@ -647,7 +665,7 @@ class OpenAICompatibleProvider(LLMProvider):
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
         try:
-            resp = await self.http_client.post(url, json=payload, timeout=LOCAL_MODEL_TIMEOUT)
+            resp = await self.http_client.post(url, json=payload, headers=_auth_headers(self.api_key), timeout=LOCAL_MODEL_TIMEOUT)
             resp.raise_for_status()
             return resp.json()
         except httpx.TimeoutException as e:
@@ -698,6 +716,7 @@ class OpenAICompatibleProvider(LLMProvider):
                 "POST",
                 url,
                 json=payload,
+                headers=_auth_headers(self.api_key),
                 timeout=LOCAL_MODEL_TIMEOUT,
             ) as response:
                 response.raise_for_status()
@@ -711,6 +730,23 @@ class OpenAICompatibleProvider(LLMProvider):
                 request=None,
                 response=None,
             )
+
+
+
+class LocalEndpointProvider(OpenAICompatibleProvider):
+    """`local/<model>`: the OpenAI-compatible server LOCAL_HTTP_BASE_URL names, Ollama's when unset."""
+
+    def __init__(
+        self,
+        api_key: str,
+        http_client: httpx.AsyncClient,
+        provider_name: str = "local",
+        base_url: Optional[str] = None,
+    ):
+        super().__init__(
+            api_key, http_client, provider_name,
+            base_url=base_url or os.getenv("LOCAL_HTTP_BASE_URL") or OLLAMA_BASE_URL,
+        )
 
 
 # ============================================================================

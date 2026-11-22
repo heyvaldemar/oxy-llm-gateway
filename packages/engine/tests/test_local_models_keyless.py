@@ -106,7 +106,7 @@ def test_the_registry_keeps_a_bounded_number_of_instances():
     client = httpx.AsyncClient()
     for i in range(registry.MAX_KEYED_INSTANCES + 50):
         registry.get_provider_for_model("vllm/m", "key-%d" % i, client)
-    assert len(registry._keyed_instances) == registry.MAX_KEYED_INSTANCES
+    assert len(registry._keyed_instances["vllm"]) == registry.MAX_KEYED_INSTANCES
 
 
 def test_a_local_model_bills_nothing_unless_the_operator_prices_it(monkeypatch):

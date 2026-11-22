@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now keeps one instance per provider and key, at most 256 of them.
+- Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now keeps one instance per provider and key, at most 256 per provider.
 
 ## [1.0.6] - 2026-11-22
 

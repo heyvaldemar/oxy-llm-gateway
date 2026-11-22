@@ -256,10 +256,10 @@ class ProviderRegistry:
         self._provider_classes: Dict[str, type[LLMProvider]] = {}
         # Instances installed by hand (tests, a host application), by provider name.
         self._provider_instances: Dict[str, LLMProvider] = {}
-        # Instances the registry built, by provider name and API key: an instance
+        # Instances the registry built, by provider name, then API key: an instance
         # holds the key it was built with, so one per name made every
         # organization's request leave with the first organization's key.
-        self._keyed_instances: Dict[tuple, LLMProvider] = {}
+        self._keyed_instances: Dict[str, Dict[str, LLMProvider]] = {}
         self._model_to_provider: Dict[str, str] = {}
         # Initialize logger to prevent AttributeError
         self.log = structlog.get_logger().bind(component="provider_registry")
@@ -323,15 +323,18 @@ class ProviderRegistry:
         if provider_name in self._provider_instances:
             return self._provider_instances[provider_name]
 
-        # Lazy-instantiate provider, one per provider name and API key.
-        # (The instance holds the key itself, so keying by it exposes nothing more.)
-        cache_key = (provider_name, api_key or "")
-        instance = self._keyed_instances.get(cache_key)
+        # Lazy-instantiate provider, one per provider name and API key. The key
+        # is only ever the dict key of a per-provider mapping and the `api_key`
+        # argument: no other local variable holds it, so an error reporter that
+        # captures locals and filters them by name (it filters `api_key`) sees
+        # nothing it would not have seen before.
+        by_key = self._keyed_instances.setdefault(provider_name, {})
+        instance = by_key.get(api_key or "")
         if instance is None:
-            if len(self._keyed_instances) >= self.MAX_KEYED_INSTANCES:
-                self._keyed_instances.pop(next(iter(self._keyed_instances)))
+            if len(by_key) >= self.MAX_KEYED_INSTANCES:
+                by_key.pop(next(iter(by_key)))
             provider_class = self._provider_classes[provider_name]
-            instance = self._keyed_instances[cache_key] = provider_class(
+            instance = by_key[api_key or ""] = provider_class(
                 api_key=api_key,
                 http_client=http_client,
                 provider_name=provider_name

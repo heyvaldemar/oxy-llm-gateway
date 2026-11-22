@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now builds the instance for each call: constructors only set attributes and the HTTP client is shared, so there is nothing to cache, and no key is held between requests.
+- Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now builds the instance for each call: constructors only set attributes and the HTTP client is shared, so there is nothing to cache, and no key is held between requests. The Gemini adapter still hands its key to Google's SDK through a process-wide setting (`genai.configure`), so concurrent Gemini requests of different organizations can cross; this does not change that, and its constructor, now run for each request, no longer logs a key prefix.
 
 ## [1.0.6] - 2026-11-22
 

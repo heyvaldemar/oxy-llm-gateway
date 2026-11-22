@@ -236,6 +236,29 @@ Return ONLY the JSON array. No markdown, no explanations.
         return []
 
 
+async def _organization_of(user_id: str) -> str:
+    """The caller's organization, from their membership.
+
+    A subscription belongs to a user and has no organization_id column: asking
+    for one made PostgREST answer 400 and these routes 500 for everyone.
+    """
+    res = await resources.http_client.get(
+        f"{SUPABASE_URL}/rest/v1/organization_members",
+        params={
+            "select": "organization_id",
+            "user_id": f"eq.{user_id}",
+            "status": "eq.active",
+            "limit": "1"
+        },
+        headers=get_supabase_headers()
+    )
+    res.raise_for_status()
+    members = res.json()
+    if not members:
+        raise HTTPException(status_code=403, detail="User not in any organization")
+    return members[0]["organization_id"]
+
+
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
@@ -268,36 +291,7 @@ async def get_cost_recommendations(
     ```
     """
     try:
-        # Get user's organization
-        subscription_res = await resources.http_client.get(
-            f"{SUPABASE_URL}/rest/v1/subscriptions",
-            params={
-                "select": "organization_id,plan_tier",
-                "user_id": f"eq.{user_id}",
-                "status": "eq.active",
-                "limit": "1"
-            },
-            headers=get_supabase_headers()
-        )
-        subscription_res.raise_for_status()
-        subscriptions = subscription_res.json()
-        
-        if not subscriptions:
-            raise HTTPException(
-                status_code=402,
-                detail="Cost optimization needs an organization on the growth, business or enterprise plan tier."
-            )
-        
-        org_id = subscriptions[0]["organization_id"]
-        plan = subscriptions[0]["plan_tier"]
-        
-        # Feature gate: Growth, Business, and Enterprise only
-        # Keep in sync with the plan limits page (growth, business, enterprise)
-        if plan not in ["growth", "business", "enterprise"]:
-            raise HTTPException(
-                status_code=403,
-                detail="Cost optimization is available on the growth, business and enterprise plan tiers. An operator can raise the plan tier."
-            )
+        org_id = await _organization_of(user_id)
         
         # Analyze usage patterns
         usage = await analyze_usage_patterns(org_id, days)
@@ -335,24 +329,7 @@ async def get_usage_analysis(
     Returns aggregated usage by model without AI recommendations.
     """
     try:
-        # Get user's organization
-        subscription_res = await resources.http_client.get(
-            f"{SUPABASE_URL}/rest/v1/subscriptions",
-            params={
-                "select": "organization_id",
-                "user_id": f"eq.{user_id}",
-                "status": "eq.active",
-                "limit": "1"
-            },
-            headers=get_supabase_headers()
-        )
-        subscription_res.raise_for_status()
-        subscriptions = subscription_res.json()
-        
-        if not subscriptions:
-            raise HTTPException(status_code=402, detail="No active subscription")
-        
-        org_id = subscriptions[0]["organization_id"]
+        org_id = await _organization_of(user_id)
         
         # Analyze usage
         usage = await analyze_usage_patterns(org_id, days)

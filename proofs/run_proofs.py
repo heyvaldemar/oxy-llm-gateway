@@ -11,7 +11,8 @@ Proofs: what Oxy claims, measured against a recording fake provider.
   kill      An agent session keeps sending requests. Another tenant's attempt to
             kill it is refused; then it is killed through the documented endpoint.
             No request started after the kill returns reaches the provider; the
-            time to the first blocked response is measured.
+            time to the first blocked response is measured. The session's row
+            records the kill: who, when and why.
   tenancy   Another tenant sends requests carrying this tenant's agent and session
             ids. All are refused; none reaches the provider or lands on this
             tenant's agent.
@@ -350,14 +351,18 @@ def proof_kill(results, tenants):
     blocked = sorted(end for start, end, st in log if start >= kill_sent and st in (409, 410))
     first_block_ms = round((blocked[0] - kill_sent) * 1000) if blocked else None
     late_ok = sum(1 for start, _, st in log if start > kill_done and st == 200)
+    # The session's row says who killed it, when and why: that is what an operator reads afterwards.
+    row = psql("SELECT status, kill_requested_at IS NOT NULL, kill_requested_by IS NOT NULL, coalesce(kill_reason, ''), "
+               "ended_at IS NOT NULL FROM agent_sessions WHERE id = '%s'" % session_id)
+    row_records_the_kill = row == ["killed|t|t|manual_kill|t"]
     ok = (kst == 200 and foreign_status == 404 and before >= 1 and after == 0 and late_ok == 0
-          and first_block_ms is not None)
+          and first_block_ms is not None and row_records_the_kill)
     results["kill"] = {
         "ok": ok, "kill_status": kst, "foreign_tenant_kill_status": foreign_status,
         "kill_call_ms": round((kill_done - kill_sent) * 1000),
         "first_blocked_response_ms": first_block_ms, "reached_provider_before_kill": before,
         "reached_provider_after_kill": after, "requests_after_kill": sum(1 for s0, _, _ in log if s0 > kill_done),
-        "answered_200_after_kill": late_ok,
+        "answered_200_after_kill": late_ok, "row_records_the_kill": row_records_the_kill,
         "statuses": {str(k): sum(1 for _, _, s1 in log if s1 == k) for k in sorted({s1 for _, _, s1 in log})},
     }
 

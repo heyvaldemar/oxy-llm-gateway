@@ -847,6 +847,16 @@ def redact_secrets(content: str) -> str:
 # Tool inputs and outputs are scanned too.
 # ============================================================================
 
+def _first_threat_type(current: str, found: str) -> str:
+    """The type of the first scan that found something.
+
+    A scan that finds nothing hands back the string "none", which is truthy, so
+    `current or found` kept "none" and a secret that sat only in `tools` or
+    `functions` was refused as "(none)".
+    """
+    return current if current and current != "none" else found
+
+
 def scan_tools_for_secrets(tools: list) -> dict:
     """
     Scan tool definitions for sensitive data.
@@ -1506,6 +1516,7 @@ async def chat_completions_proxy(
     dlp_result = scan_for_secrets(messages)
     threat_detected = dlp_result["threat_detected"]
     threat_type = dlp_result["threat_type"]
+    threat_count = dlp_result["threat_count"]
     all_threats = dlp_result["details"].copy()
     
     # 2. 🆕 Scan tool definitions (hard block if secrets/keys/PCI found)
@@ -1513,7 +1524,8 @@ async def chat_completions_proxy(
         tool_dlp_result = scan_tools_for_secrets(tools)
         if tool_dlp_result["threat_detected"]:
             threat_detected = True
-            threat_type = threat_type or tool_dlp_result["threat_type"]
+            threat_type = _first_threat_type(threat_type, tool_dlp_result["threat_type"])
+            threat_count += tool_dlp_result["threat_count"]
             all_threats.extend(tool_dlp_result["details"])
             log.warning("dlp_tool_definition_blocked",
                        user_id=user_id,
@@ -1525,7 +1537,8 @@ async def chat_completions_proxy(
         func_dlp_result = scan_tools_for_secrets(legacy_tools)
         if func_dlp_result["threat_detected"]:
             threat_detected = True
-            threat_type = threat_type or func_dlp_result["threat_type"]
+            threat_type = _first_threat_type(threat_type, func_dlp_result["threat_type"])
+            threat_count += func_dlp_result["threat_count"]
             all_threats.extend(func_dlp_result["details"])
     
     if threat_detected:
@@ -1535,8 +1548,8 @@ async def chat_completions_proxy(
             project_id=project_id,
             organization_id=organization_id,
             threat_type=threat_type,
-            threat_count=dlp_result["threat_count"],
-            patterns_detected=dlp_result["details"],
+            threat_count=threat_count,
+            patterns_detected=all_threats,
             mode=dlp_mode,
         )
         # Log the event for audit trail (even in log-only mode)

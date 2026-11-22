@@ -450,16 +450,20 @@ class SupabaseTable:
         if self._delete:
             params = list(self._filters.items()) + list(self._range_filters)
             
+            # Without Prefer: return=representation PostgREST answers a bare 204,
+            # and reading that empty body as JSON made every delete answer 500
+            # after the rows were gone. With it, .data holds the rows removed.
             res = await self.client.delete(
                 f"{self.url}/rest/v1/{self.table_name}",
                 headers={
                     "apikey": self.key,
-                    "Authorization": f"Bearer {self.key}"
+                    "Authorization": f"Bearer {self.key}",
+                    "Prefer": "return=representation"
                 },
                 params=params
             )
             res.raise_for_status()
-            return SupabaseResponse(res.json())
+            return SupabaseResponse(res.json() if res.content else [])
         
         # Handle SELECT operation. Use a list of tuples so range filters
         # (gte/lte on the same column) survive URL encoding.
@@ -664,7 +668,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="Oxy Engine API", 
-    version="1.0.5",
+    version="1.0.6",
     description="""
 # Oxy Engine - AI Control Plane
 
@@ -727,7 +731,7 @@ Machine-readable OpenAPI specification available at `/openapi.json` for AI agent
 
 ### Error Codes
 - `401`: Invalid/expired token - re-authenticate
-- `402`: Budget exceeded - request budget increase or wait for reset
+- `402`: Budget exceeded - the project's total budget is spent and nothing resets it; an operator must raise it. Do not retry until it changes
 - `410`: Session killed - create new session
 - `429`: Rate limited - wait and retry with exponential backoff
 - `451`: Content blocked by DLP - remove sensitive data
@@ -2670,7 +2674,7 @@ async def health(request: Request):
     """
     health_status = {
         "status": "active",
-        "version": "1.0.5",
+        "version": "1.0.6",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
     

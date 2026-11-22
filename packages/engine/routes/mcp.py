@@ -519,6 +519,14 @@ async def delete_mcp_server(
     """
     organization_id = auth["organization_id"]
     
+    # The server must be this organization's before its tools are touched
+    # (they used to be deleted by server id alone).
+    owned = await resources.supabase.table("mcp_servers").select("id").eq(
+        "id", server_id
+    ).eq("organization_id", organization_id).execute()
+    if not owned.data:
+        raise HTTPException(status_code=404, detail="MCP server not found")
+    
     # Delete associated tools first
     await resources.supabase.table("tools").delete().eq(
         "mcp_server_id", server_id

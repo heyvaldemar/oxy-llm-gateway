@@ -192,7 +192,7 @@ Oxy speaks the OpenAI API on both sides, so an inference gateway like the second
 | No API key is stored in Redis | 10 tenants' keys checked against every name and value of 45 Redis keys: 0 found |
 | Every request is audited | 963 requests sent with a valid key by the proofs above, 963 `request_logs` rows, refusals included, 5 of them refused by the burst limit (429). A key revoked in the dashboard kept all 4 of its rows; `request_logs.api_key_id` is `ON DELETE SET NULL` |
 
-`proofs/plant_violations.py` then plants, one at a time, the bug each proof exists for (a non-atomic reservation, the old spend ledger that reset every minute, DLP switched off, the kill state ignored, another tenant's ids accepted, a revoked key left in the cache, fail-open checks when Redis is down, the database functions and an open policy re-granted to the browser roles, the cache named by the raw key, audit writes dropped, a dashboard revoke that deletes the key and cascades its audit rows, a burst-limited request left without its row), requires that proof to fail, and restores the code. CI runs both on every push and daily (job **Proofs, each shown its planted violation**) and keeps the JSON; the branch `status` keeps the last 30 days.
+`proofs/plant_violations.py` then plants, one at a time, the bug each proof exists for (a non-atomic reservation, the old spend ledger that reset every minute, DLP switched off, the kill state ignored, another tenant's ids accepted, a revoked key left in the cache, fail-open checks when Redis is down, the database functions and an open policy re-granted to the browser roles, the cache named by the raw key, audit writes dropped, a dashboard revoke that deletes the key and cascades its audit rows, a burst-limited request left without its row, a killed session's row that forgets who killed it and why), requires that proof to fail, and restores the code. CI runs both on every push and daily (job **Proofs, each shown its planted violation**) and keeps the JSON; the branch `status` keeps the last 30 days.
 
 ```bash
 docker compose -f docker-compose.yml -f proofs/docker-compose.proofs.yml up -d --build --wait
@@ -218,7 +218,7 @@ Every number in this table comes from one run: CI run [43776441730](https://gith
 - Frontend: Next.js 16 (App Router, Turbopack), TypeScript strict, supabase-js + `@supabase/ssr`, Radix UI primitives, Tailwind
 - Data: Postgres 16, PostgREST 12, GoTrue (Supabase Auth) v2
 - Infra: docker-compose, nginx (path adapter), Caddy for TLS
-- Tests: pytest (464 offline tests), Playwright + Vitest on the UI
+- Tests: pytest (477 offline tests), Playwright + Vitest on the UI
 
 ## Repository layout
 
@@ -243,7 +243,7 @@ oxy/
 ## Running the tests
 
 ```bash
-make test-core          # 464 offline unit tests, a few seconds
+make test-core          # 477 offline unit tests, a few seconds
 make test-integration   # requires a running engine + live external services
 ```
 

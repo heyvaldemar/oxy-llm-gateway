@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.6] - 2026-11-22
+
+Four defects that running the lab and reading the answers found, and three more of the same shape that fixing them turned up. Each has a test that fails on 1.0.5; the kill proof gained a check and a planted violation of its own.
+
+### Fixed
+
+- A secret that sits only in a tool definition is named. The request path kept the type of the first scan that found something with `or`, and a scan that finds nothing returns the string "none", which is truthy: a secret found only in `tools` or in the legacy `functions` was refused with 451 but described as "Sensitive data detected (none)", and the audit row and the log carried "none". It is now `tool_github_token` and the like, and the log counts every match, not only the messages' (`tests/test_dlp_tools_only.py`).
+- Deleting an agent no longer touches another organization. `DELETE /v1/agents/{id}` marked the agent's running sessions killed by agent id alone, so the owner of one organization could end another's sessions by sending that agent's id; the delete itself was scoped and found nothing, but the sessions were already killed. It now answers 404 for an agent that is not the caller's organization's. The sessions it ends record who, when and why (`kill_requested_by`, `kill_requested_at`, `kill_reason` were empty on this path) and get the kill flag in Redis the gateway reads first. `DELETE /v1/mcp/servers/{id}` had the same shape: it deleted the server's tools by server id before looking at the organization (`tests/test_agent_delete.py`).
+- Deleting an agent or an MCP server answered 500 after the rows were gone. The engine's database client did not ask PostgREST for the deleted rows and read the empty reply as JSON; it now does, so `.data` holds what was removed and a delete that removed nothing is a 404.
+- `GET /cost-optimizer/recommendations` and `/usage-analysis` asked the `subscriptions` table for an `organization_id` column it has never had (a subscription belongs to a user), so PostgREST answered 400 and the routes answered 500 for everyone. The organization now comes from the caller's membership, as on every other dashboard route, and a caller in no organization gets 403. The plan-tier gate on these two routes is gone: 1.0.1 took plan tiers out of the request path, and `/v1/cost-optimizer` is not gated either (`tests/test_cost_optimizer_legacy_org.py`).
+- The API description told an agent to "wait for reset" on a 402. A project's budget is its total spend and nothing resets it; the response's own hint, "do not retry until it changes", was right and the description now says the same (`tests/test_openapi_402.py`).
+
+### Proofs
+
+- The kill proof reads the killed session's row: `killed`, who, when, why (`manual_kill`) and the end time must all be there. A new planted violation, `kill_record`, makes the row forget who killed it and why, and the proof must fail. The lab's 1.0.1 run had found those fields empty after a kill; the routes have written them since, and this keeps them written.
+
 ## [1.0.5] - 2026-11-16
 
 The dashboard says what the engine does. Four of these changes are Tatiana Mikhaleva's pull requests (#32 to #35): a page that promised a monthly limit, alerts at other thresholds or a cap no tier has now says what the gateway enforces, and the API Keys page shows when a key was last used.

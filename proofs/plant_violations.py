@@ -13,6 +13,7 @@ script exits non-zero.
                 Redis each cycle and a missing counter reads as zero
   dlp           the DLP scan reports nothing
   kill          the gateway ignores a session's kill state
+  kill_record   a killed session's row loses who, when and why
   tenancy       agent and session headers are not checked against the key's organization
   revoke        revoking a key leaves its cached record in Redis
   failclosed    with Redis down, the budget check and the kill check fail open
@@ -92,6 +93,15 @@ PLANTS = {
         "edits": [("routes/proxy.py",
                    "        terminated = bool(row.get(\"terminated\"))\n        if not terminated:\n",
                    "        terminated = False  # PLANTED VIOLATION: the kill state is ignored\n        if False:\n")],
+    },
+    "kill_record": {
+        "proof": "kill", "run": "kill",
+        "sql": ("CREATE FUNCTION planted_forget_kill() RETURNS trigger LANGUAGE plpgsql AS $$ "
+                "BEGIN NEW.kill_requested_at := NULL; NEW.kill_requested_by := NULL; NEW.kill_reason := NULL; RETURN NEW; END $$; "
+                "CREATE TRIGGER planted_forget_kill BEFORE UPDATE ON agent_sessions "
+                "FOR EACH ROW EXECUTE FUNCTION planted_forget_kill();",
+                "DROP TRIGGER IF EXISTS planted_forget_kill ON agent_sessions; DROP FUNCTION IF EXISTS planted_forget_kill();"),
+        "edits": [],
     },
     "tenancy": {
         "proof": "tenancy", "run": "tenancy",

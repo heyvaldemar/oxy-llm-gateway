@@ -404,12 +404,28 @@ async def delete_agent(
     if role != "owner":
         raise HTTPException(status_code=403, detail="Only owners can delete agents")
     
-    # Kill all running sessions first
-    await resources.supabase.table("agent_sessions").update({
+    # The agent must be this organization's before anything of it is touched
+    # (the sessions used to be killed by agent id alone).
+    owned = await resources.supabase.table("agents").select("id").eq(
+        "id", agent_id
+    ).eq("organization_id", organization_id).execute()
+    if not owned.data:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Kill all running sessions first: the row records who, when and why, and the
+    # flag in Redis, which the gateway reads first, refuses them at once.
+    now = datetime.now(timezone.utc).isoformat()
+    killed = await resources.supabase.table("agent_sessions").update({
         "status": "killed",
+        "kill_requested_at": now,
+        "kill_requested_by": auth["user_id"],
         "kill_reason": "Agent deleted",
-        "ended_at": datetime.now(timezone.utc).isoformat()
-    }).eq("agent_id", agent_id).in_("status", ["pending", "running"]).execute()
+        "ended_at": now
+    }).eq("agent_id", agent_id).eq("organization_id", organization_id).in_(
+        "status", ["pending", "running"]
+    ).execute()
+    for session in killed.data or []:
+        await mark_session_terminated(session["id"])
     
     # Delete agent (cascades to sessions, api_keys)
     result = await resources.supabase.table("agents").delete().eq(

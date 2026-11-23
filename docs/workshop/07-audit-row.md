@@ -21,17 +21,18 @@ from request_logs group by 1, 2, 3 order by 4 desc;"
  mock    | openai          | none               |    11
  blocked | blocked         | github_token       |     2
  blocked | blocked         | session_terminated |     2
- blocked | blocked         | credit_card        |     1
- success | oxy-healthcheck | none               |     1
  blocked | blocked         | budget_exceeded    |     1
-(6 rows)
+ success | oxy-healthcheck | none               |     1
+ blocked | blocked         | credit_card        |     1
+ blocked | blocked         | tool_github_token  |     1
+(7 rows)
 ```
 
 - `mock` rows are requests the gateway answered in mock mode; `provider` says which provider would have been called.
 - The `success` row from `oxy-healthcheck` is the `ping` from Module 1, which the gateway answered itself.
-- `blocked` rows are refusals. `provider` is `blocked`, because nothing was called, and `threat_type` holds the reason: `budget_exceeded` (Module 4), `github_token` and `credit_card` (Module 5), `session_terminated` (Module 6).
+- `blocked` rows are refusals. `provider` is `blocked`, because nothing was called, and `threat_type` holds the reason: `budget_exceeded` (Module 4), `github_token`, `tool_github_token` and `credit_card` (Module 5), `session_terminated` (Module 6). `tool_github_token` is the same secret found in a tool definition rather than in a message.
 
-If you ran every step and nothing else, that is 18 rows for 18 requests: 2 in Module 1, 5 in Module 2, 2 in Module 4, 5 in Module 5 and 4 in Module 6.
+If you ran every step and nothing else, that is 19 rows for 19 requests: 2 in Module 1, 5 in Module 2, 2 in Module 4, 6 in Module 5 and 4 in Module 6.
 
 ## 2. The newest rows
 
@@ -47,12 +48,12 @@ from request_logs order by created_at desc limit 6;"
 ```
    time   |    model    | status  |    threat_type     | cost_usd | latency_ms | privacy_mode
 ----------+-------------+---------+--------------------+----------+------------+---------------
- 16:35:02 | gpt-4o-mini | mock    | none               | 0.000004 |          9 | metadata_only
- 16:35:01 | gpt-4o-mini | blocked | session_terminated | 0.000000 |          5 | metadata_only
- 16:35:01 | gpt-4o-mini | blocked | session_terminated | 0.000000 |          5 | metadata_only
- 16:35:01 | gpt-4o-mini | mock    | none               | 0.000004 |         14 | metadata_only
- 16:35:01 | gpt-4o-mini | mock    | none               | 0.000004 |         11 | metadata_only
- 16:35:01 | gpt-4o-mini | blocked | credit_card        | 0.000000 |          7 | metadata_only
+ 15:48:33 | gpt-4o-mini | mock    | none               | 0.000004 |         20 | metadata_only
+ 15:48:33 | gpt-4o-mini | blocked | session_terminated | 0.000000 |         14 | metadata_only
+ 15:48:33 | gpt-4o-mini | blocked | session_terminated | 0.000000 |         16 | metadata_only
+ 15:48:32 | gpt-4o-mini | mock    | none               | 0.000004 |         39 | metadata_only
+ 15:48:31 | gpt-4o-mini | mock    | none               | 0.000004 |         21 | metadata_only
+ 15:48:31 | gpt-4o-mini | blocked | tool_github_token  | 0.000000 |         17 | metadata_only
 (6 rows)
 ```
 
@@ -60,7 +61,7 @@ A refusal costs nothing (`cost_usd` 0): the gateway answers it before any provid
 
 ## 3. What was not kept
 
-In modules 5 and 6 you sent three GitHub tokens and a card number. Count the rows that kept any prompt at all:
+In modules 5 and 6 you sent four GitHub tokens, one of them inside a tool definition, and a card number. Count the rows that kept any prompt at all:
 
 ```bash
 docker compose exec postgres psql -U postgres -d oxy -c "
@@ -90,13 +91,13 @@ oxy -s "localhost:8000/v1/requests?limit=2" | jq '.items[] | {created_at, model,
 
 ```
 {
-  "created_at": "2026-11-16T16:35:02.130528+00:00",
+  "created_at": "2026-11-23T15:48:33.848874+00:00",
   "model": "gpt-4o-mini",
   "status": "mock",
   "cost_usd": 0.000004
 }
 {
-  "created_at": "2026-11-16T16:35:01.975333+00:00",
+  "created_at": "2026-11-23T15:48:33.436238+00:00",
   "model": "gpt-4o-mini",
   "status": "blocked",
   "cost_usd": 0.0
@@ -113,8 +114,8 @@ oxy -s localhost:8000/v1/exports/requests.csv | head -3
 
 ```
 id,created_at,provider,model,status,latency_ms,prompt_tokens,completion_tokens,total_tokens,cost_usd,project_id
-37f3d9fd-8adc-4d59-b0d3-30fe0dec34e0,2026-11-16T16:35:02.130528+00:00,openai,gpt-4o-mini,mock,9,10,5,15,4e-06,34d90aef-195c-4ce6-83ef-5343bb45a02f
-d858e8c6-a48e-487a-ab8c-e243ef1b24bf,2026-11-16T16:35:01.975333+00:00,blocked,gpt-4o-mini,blocked,5,0,0,0,0.0,34d90aef-195c-4ce6-83ef-5343bb45a02f
+c118ae17-d890-4692-a842-d241631f72c4,2026-11-23T15:48:33.848874+00:00,openai,gpt-4o-mini,mock,20,10,5,15,4e-06,bdeb59c9-bec4-4b06-9a44-980958ca2cdb
+672b8e9b-43fc-48fc-88de-38f546415ced,2026-11-23T15:48:33.436238+00:00,blocked,gpt-4o-mini,blocked,14,0,0,0,0.0,bdeb59c9-bec4-4b06-9a44-980958ca2cdb
 ```
 
 The API and the export give the status of each request; the reason for a refusal (`threat_type`) is in the row itself, as in step 1.
@@ -143,7 +144,7 @@ docker compose exec postgres psql -U postgres -d oxy -c "select count(*) as rows
 ```
  rows
 ------
-   18
+   19
 (1 row)
 ```
 
@@ -178,7 +179,7 @@ docker compose exec postgres psql -U postgres -d oxy -c "select count(*) as rows
 ```
  rows
 ------
-   18
+   19
 (1 row)
 ```
 

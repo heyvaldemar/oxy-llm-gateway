@@ -42,7 +42,7 @@ Every command block is meant to be copied as it is. The block after it, marked *
 
 ## Tested on
 
-Oxy [v1.0.5](https://github.com/heyvaldemar/oxy-llm-gateway/releases/tag/v1.0.5), on 2026-11-16: a clean Docker host (Docker Engine 29.9.3, Compose 5.7.1), every command in zsh 5.9, the browser steps in Chromium 140. Module 1 checks out that tag, so the commands keep matching their output when `main` moves on.
+Oxy [v1.0.6](https://github.com/heyvaldemar/oxy-llm-gateway/releases/tag/v1.0.6), on 2026-11-23: a clean Docker host (Docker Engine 29.9.3, Compose 5.7.1), every command in zsh 5.9, the browser steps in Chromium 140. Module 1 checks out that tag, so the commands keep matching their output when `main` moves on.
 
 ## When you are done
 

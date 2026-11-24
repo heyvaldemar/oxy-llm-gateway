@@ -25,7 +25,7 @@ class MockClient:
     def __init__(self, responder):
         self.responder = responder
 
-    async def post(self, url, json=None, timeout=None):
+    async def post(self, url, json=None, timeout=None, headers=None):
         return self.responder("post", url, json, timeout)
 
     async def get(self, url, timeout=None):

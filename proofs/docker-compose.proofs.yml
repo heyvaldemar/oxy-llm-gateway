@@ -27,6 +27,12 @@ services:
       # Let hundreds of concurrent requests reach the budget check instead of the
       # 10-per-second burst limiter.
       BURST_LIMIT_PER_SECOND: "100000"
+      # The same fake answers for a local model: vllm/... requests go to it, with no
+      # provider key anywhere. A million tokens of a local model is priced at what
+      # the operator says it costs them, so a budget can cap it like a hosted one.
+      VLLM_BASE_URL: http://fake-provider:9000
+      LOCAL_PROMPT_PRICE_PER_MILLION: "1.00"
+      LOCAL_COMPLETION_PRICE_PER_MILLION: "2.00"
     depends_on:
       fake-provider:
         condition: service_healthy

@@ -14,6 +14,8 @@ script exits non-zero.
   dlp           the DLP scan reports nothing
   kill          the gateway ignores a session's kill state
   kill_record   a killed session's row loses who, when and why
+  local_key     a local model needs a provider key again (400, never served)
+  local_price   a local model's price is ignored: no budget ever caps it
   tenancy       agent and session headers are not checked against the key's organization
   revoke        revoking a key leaves its cached record in Redis
   failclosed    with Redis down, the budget check and the kill check fail open
@@ -102,6 +104,20 @@ PLANTS = {
                 "FOR EACH ROW EXECUTE FUNCTION planted_forget_kill();",
                 "DROP TRIGGER IF EXISTS planted_forget_kill ON agent_sessions; DROP FUNCTION IF EXISTS planted_forget_kill();"),
         "edits": [],
+    },
+    "local_key": {
+        "proof": "local", "run": "local",
+        "edits": [("routes/proxy.py",
+                   "        if provider_name in LOCAL_PROVIDERS and exc.status_code == 400:\n",
+                   "        if False:  # PLANTED VIOLATION: a local model needs a provider key again\n")],
+    },
+    "local_price": {
+        "proof": "local", "run": "local",
+        "edits": [("providers/pricing.py",
+                   "            \"prompt_tokens_per_million\": price(\"LOCAL_PROMPT_PRICE_PER_MILLION\"),\n"
+                   "            \"completion_tokens_per_million\": price(\"LOCAL_COMPLETION_PRICE_PER_MILLION\"),\n",
+                   "            \"prompt_tokens_per_million\": Decimal(\"0\"),  # PLANTED VIOLATION: the operator's price is ignored\n"
+                   "            \"completion_tokens_per_million\": Decimal(\"0\"),\n")],
     },
     "tenancy": {
         "proof": "tenancy", "run": "tenancy",

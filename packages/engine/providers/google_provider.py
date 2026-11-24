@@ -201,7 +201,7 @@ class GoogleProvider(LLMProvider):
         
         # MOCK MODE: Skip validation and library initialization
         if self._mock_mode:
-            self.log.info("google_provider_mock_mode", key_prefix=api_key[:12])
+            self.log.debug("google_provider_mock_mode")
             self.safety_settings = {}
             return
         
@@ -229,7 +229,7 @@ class GoogleProvider(LLMProvider):
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         }
         
-        self.log.info("google_provider_initialized", api_key_prefix=api_key[:10])
+        self.log.debug("google_provider_initialized")  # built for each request: no key material, no info line
     
     def _convert_messages_to_gemini_format(
         self, 

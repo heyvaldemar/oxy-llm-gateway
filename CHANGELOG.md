@@ -2,8 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Local models are reachable. A request for `vllm/<name>`, `ollama/<name>`, `docker/<name>` or `local/<name>` answered 400 "Provider not configured" for want of a provider key the model never needed, so the adapters in `providers/` could not be reached from the gateway. A local provider now takes the organization's key if there is one, else `<NAME>_API_KEY`, else none, and a server started with its own key is sent it as a bearer token. `local/<name>` goes to `LOCAL_HTTP_BASE_URL` (Ollama's address when unset). A local model bills nothing per token unless `LOCAL_PROMPT_PRICE_PER_MILLION` and `LOCAL_COMPLETION_PRICE_PER_MILLION` say what a million tokens cost the operator; with them set, a project's budget caps it like a hosted model (`tests/test_local_models_keyless.py`).
+- A proof for it, **local**, and two planted violations (`local_key`, `local_price`): requests for `vllm/...` are served by the recording fake with no provider key anywhere, a $0.02 budget buys exactly three at the configured price, none of eleven secret types sent to a local model reaches the server, and a killed session's next requests do not either.
+
 ### Fixed
 
+- Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now builds the instance for each call: constructors only set attributes and the HTTP client is shared, so there is nothing to cache, and no key is held between requests. The Gemini adapter still hands its key to Google's SDK through a process-wide setting (`genai.configure`), so concurrent Gemini requests of different organizations can cross; this does not change that, and its constructor, now run for each request, no longer logs a key prefix.
 - The dashboard says why a 402 came back. Every 402 opened a "Subscription Required" notice with an Update Billing button, but on the default stack a 402 means a project has spent its whole budget, and nothing resets a budget. A `BUDGET_EXCEEDED` answer now opens "Budget spent" and says to raise the budget in the project's settings; any other 402 keeps the billing notice (`paymentRequiredNotice`, with a Vitest test).
 
 ## [1.0.6] - 2026-11-22

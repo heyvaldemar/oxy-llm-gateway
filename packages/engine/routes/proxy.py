@@ -230,7 +230,29 @@ async def _resolve_org_paused(organization_id: str, key_data: CacheData) -> bool
 # HELPER FUNCTIONS
 # ============================================================================
 
+# Local providers run on the operator's own hardware and most take no key. One
+# started with an API key of its own (vLLM's --api-key) gets it the same two
+# ways as a hosted provider: the organization's provider page, or <NAME>_API_KEY.
+LOCAL_PROVIDERS = {"ollama", "vllm", "docker", "local"}
+# Not a prefix any mock key uses (see MOCK_KEY_PREFIXES in the request path).
+from providers.local_provider import NO_KEY_PLACEHOLDER as LOCAL_PROVIDER_PLACEHOLDER_KEY
+
+
 async def get_provider_api_key(organization_id: str, provider_name: str) -> str:
+    """The provider's key for this organization; a local provider that has none is not an error.
+
+    Up to 1.0.6 a request for ollama/..., vllm/... or local/... answered 400
+    "Provider not configured" for want of a key the model never needed.
+    """
+    try:
+        return await _provider_key_from_config(organization_id, provider_name)
+    except HTTPException as exc:
+        if provider_name in LOCAL_PROVIDERS and exc.status_code == 400:
+            return LOCAL_PROVIDER_PLACEHOLDER_KEY
+        raise
+
+
+async def _provider_key_from_config(organization_id: str, provider_name: str) -> str:
     """
     Fetch and DECRYPT the provider API key (OpenAI, Anthropic, Google) for an organization.
     
@@ -259,6 +281,10 @@ async def get_provider_api_key(organization_id: str, provider_name: str) -> str:
         "openai": ("OPENAI_API_KEY",),
         "anthropic": ("ANTHROPIC_API_KEY",),
         "google": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+        "ollama": ("OLLAMA_API_KEY",),
+        "vllm": ("VLLM_API_KEY",),
+        "docker": ("DOCKER_API_KEY",),
+        "local": ("LOCAL_API_KEY",),
     }
     env_fallback_key = None
     for env_name in _ENV_FALLBACK.get(provider_name, ()):

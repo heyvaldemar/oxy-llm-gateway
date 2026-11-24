@@ -159,7 +159,7 @@ What the gateway does today (heuristic where noted, best-effort, no SLA); what i
 - **Rate limiting and security headers** — per-key throttling, HSTS/CSP/etc.
 - **Geo / IP protections** — header-first country/region blocking
 - **Notification settings** — Slack, Discord and Zapier webhook URLs and events per organization are stored (`/v1/notifications/settings`); budget alerts are sent to them, see below for the rest
-- **Self-hosted models** — any OpenAI-compatible endpoint (vLLM, Ollama's OpenAI API, an inference gateway) through `OPENAI_API_BASE`, as the proofs' fake provider is wired. The dedicated Ollama and vLLM adapters in `providers/` are not reachable from the gateway yet: it requires a stored provider key for them, which the `providers` table cannot hold
+- **Self-hosted models** — a model named `vllm/<name>`, `ollama/<name>` or `local/<name>` goes to your own server, with no provider key: `VLLM_BASE_URL`, `OLLAMA_BASE_URL` or `LOCAL_HTTP_BASE_URL` say where (a server started with its own key gets it as `VLLM_API_KEY` and the like, or on the provider page). A local model bills nothing per token unless you set `LOCAL_PROMPT_PRICE_PER_MILLION` and `LOCAL_COMPLETION_PRICE_PER_MILLION` to what a million tokens cost you, and then a project's budget caps it like a hosted one. DLP, the kill switch, budgets and the audit trail run on it as on any other model, and the **local** proof measures that against the recording fake. Any other OpenAI-compatible endpoint, an inference gateway included, still goes through `OPENAI_API_BASE`.
 - **Intelligence + security score** — heuristic dashboard signals (advisory only)
 
 For the canonical mapping between feature, code, tests, and docs see `docs/product/FEATURE_MATRIX.yml`.
@@ -192,7 +192,7 @@ Oxy speaks the OpenAI API on both sides, so an inference gateway like the second
 | No API key is stored in Redis | 10 tenants' keys checked against every name and value of 45 Redis keys: 0 found |
 | Every request is audited | 963 requests sent with a valid key by the proofs above, 963 `request_logs` rows, refusals included, 5 of them refused by the burst limit (429). A key revoked in the dashboard kept all 4 of its rows; `request_logs.api_key_id` is `ON DELETE SET NULL` |
 
-`proofs/plant_violations.py` then plants, one at a time, the bug each proof exists for (a non-atomic reservation, the old spend ledger that reset every minute, DLP switched off, the kill state ignored, another tenant's ids accepted, a revoked key left in the cache, fail-open checks when Redis is down, the database functions and an open policy re-granted to the browser roles, the cache named by the raw key, audit writes dropped, a dashboard revoke that deletes the key and cascades its audit rows, a burst-limited request left without its row, a killed session's row that forgets who killed it and why), requires that proof to fail, and restores the code. CI runs both on every push and daily (job **Proofs, each shown its planted violation**) and keeps the JSON; the branch `status` keeps the last 30 days.
+`proofs/plant_violations.py` then plants, one at a time, the bug each proof exists for (a non-atomic reservation, the old spend ledger that reset every minute, DLP switched off, the kill state ignored, another tenant's ids accepted, a revoked key left in the cache, fail-open checks when Redis is down, the database functions and an open policy re-granted to the browser roles, the cache named by the raw key, audit writes dropped, a dashboard revoke that deletes the key and cascades its audit rows, a burst-limited request left without its row, a killed session's row that forgets who killed it and why, a local model that needs a provider key again, a local model's price ignored), requires that proof to fail, and restores the code. CI runs both on every push and daily (job **Proofs, each shown its planted violation**) and keeps the JSON; the branch `status` keeps the last 30 days.
 
 ```bash
 docker compose -f docker-compose.yml -f proofs/docker-compose.proofs.yml up -d --build --wait
@@ -209,7 +209,7 @@ Every number in this table comes from one run: CI run [43776441730](https://gith
 - **The vault shim uses pgcrypto AES with a configurable key.** It is intentionally weaker than Supabase's pgsodium-backed Vault. Review `db/supabase-compat.sql` before storing real provider keys in it.
 - **Email auto-confirm is on by default** so signups work without SMTP. Disable `GOTRUE_MAILER_AUTOCONFIRM` and configure SMTP for any deployment that handles real users.
 - **A budget is the project's total spend**, not a monthly allowance: nothing resets it. The Redis counter is the ledger; the budget worker copies it to `projects.current_spend` every 60 s, and if Redis loses the counter it resumes from that copy, so at most the last minute's spend can be spent again.
-- **Not wired in this release.** These have code or schema in the repository but do not work end to end, and the dashboard does not offer them: accepting team invitations (`/management/team/invite/accept` answers 501; an operator adds members in `organization_members`); SSO sign-in (`/auth/sso/callback` answers 501, three database functions are missing); exporting a user's data (`/management/export-data` answers 501, its database function is missing); delivery to registered webhooks, and Slack, Discord and Zapier alerts other than the budget's; cost-spike auto-suspend (the worker reads a column that does not exist); scheduled deletion by the retention window; approving an MCP tool call; redeeming referral credits; cost attribution tags (nothing writes them); key-rotation headers; the dedicated Ollama and vLLM adapters; enforcing agent budgets, team-member caps and per-tool MCP limits.
+- **Not wired in this release.** These have code or schema in the repository but do not work end to end, and the dashboard does not offer them: accepting team invitations (`/management/team/invite/accept` answers 501; an operator adds members in `organization_members`); SSO sign-in (`/auth/sso/callback` answers 501, three database functions are missing); exporting a user's data (`/management/export-data` answers 501, its database function is missing); delivery to registered webhooks, and Slack, Discord and Zapier alerts other than the budget's; cost-spike auto-suspend (the worker reads a column that does not exist); scheduled deletion by the retention window; approving an MCP tool call; redeeming referral credits; cost attribution tags (nothing writes them); key-rotation headers; enforcing agent budgets, team-member caps and per-tool MCP limits.
 - **Without Redis the gateway refuses what it cannot check.** A request against a budget answers 503; a request in an agent session is decided by the session's row in Postgres, or refused. Other requests are still served, a little slower (the API key is looked up in Postgres).
 
 ## Tech stack
@@ -218,7 +218,7 @@ Every number in this table comes from one run: CI run [43776441730](https://gith
 - Frontend: Next.js 16 (App Router, Turbopack), TypeScript strict, supabase-js + `@supabase/ssr`, Radix UI primitives, Tailwind
 - Data: Postgres 16, PostgREST 12, GoTrue (Supabase Auth) v2
 - Infra: docker-compose, nginx (path adapter), Caddy for TLS
-- Tests: pytest (477 offline tests), Playwright + Vitest on the UI
+- Tests: pytest (491 offline tests), Playwright + Vitest on the UI
 
 ## Repository layout
 
@@ -243,7 +243,7 @@ oxy/
 ## Running the tests
 
 ```bash
-make test-core          # 477 offline unit tests, a few seconds
+make test-core          # 491 offline unit tests, a few seconds
 make test-integration   # requires a running engine + live external services
 ```
 

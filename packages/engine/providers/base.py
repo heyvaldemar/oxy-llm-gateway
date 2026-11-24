@@ -252,6 +252,7 @@ class ProviderRegistry:
     
     def __init__(self):
         self._provider_classes: Dict[str, type[LLMProvider]] = {}
+        # Instances installed by hand (tests, a host application), by provider name.
         self._provider_instances: Dict[str, LLMProvider] = {}
         self._model_to_provider: Dict[str, str] = {}
         # Initialize logger to prevent AttributeError
@@ -313,16 +314,19 @@ class ProviderRegistry:
                 f"Available providers: {list(self._provider_classes.keys())}"
             )
         
-        # Lazy-instantiate provider (cache per provider_name)
-        if provider_name not in self._provider_instances:
-            provider_class = self._provider_classes[provider_name]
-            self._provider_instances[provider_name] = provider_class(
-                api_key=api_key,
-                http_client=http_client,
-                provider_name=provider_name
-            )
-        
-        return self._provider_instances[provider_name]
+        if provider_name in self._provider_instances:
+            return self._provider_instances[provider_name]
+
+        # One instance per call. An instance holds the API key it was built with,
+        # and the key differs by organization: an instance cached per provider
+        # name made every organization's request leave with the first one's key.
+        # Constructors only set attributes (the HTTP client is shared), so there
+        # is nothing worth caching, and no secret outlives the request in a cache.
+        return self._provider_classes[provider_name](
+            api_key=api_key,
+            http_client=http_client,
+            provider_name=provider_name
+        )
     
     def get_provider_name_for_model(self, model: str) -> str:
         """

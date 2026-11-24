@@ -10,6 +10,7 @@
 ### Fixed
 
 - Every organization's request left with the first organization's provider key. The provider registry built one instance per provider name, and an instance keeps the key it was built with, so once one organization had called a provider, the others' requests were sent with that key and their own were never used. The registry now builds the instance for each call: constructors only set attributes and the HTTP client is shared, so there is nothing to cache, and no key is held between requests. The Gemini adapter still hands its key to Google's SDK through a process-wide setting (`genai.configure`), so concurrent Gemini requests of different organizations can cross; this does not change that, and its constructor, now run for each request, no longer logs a key prefix.
+- The dashboard says why a 402 came back. Every 402 opened a "Subscription Required" notice with an Update Billing button, but on the default stack a 402 means a project has spent its whole budget, and nothing resets a budget. A `BUDGET_EXCEEDED` answer now opens "Budget spent" and says to raise the budget in the project's settings; any other 402 keeps the billing notice (`paymentRequiredNotice`, with a Vitest test).
 
 ## [1.0.6] - 2026-11-22
 

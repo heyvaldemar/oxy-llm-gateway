@@ -8,11 +8,11 @@
 ```bash
 git clone https://github.com/heyvaldemar/oxy-llm-gateway.git
 cd oxy-llm-gateway
-git checkout --quiet v1.0.5
+git checkout --quiet v1.0.6
 docker compose up -d --build --wait
 ```
 
-The first run builds the engine and dashboard images; it took about two and a half minutes when this lab was tested and takes longer on a slow connection. `--wait` returns only when every service reports healthy.
+The first run builds the engine and dashboard images; it took about two minutes when this lab was tested and takes longer on a slow connection. `--wait` returns only when every service reports healthy.
 
 **Expected output** (the last lines):
 
@@ -33,20 +33,20 @@ docker compose ps --format 'table {{.Service}}\t{{.Status}}'
 
 ```
 SERVICE                STATUS
-engine                 Up 12 seconds (healthy)
-gotrue                 Up 18 seconds
-mailpit                Up 23 seconds (healthy)
-nginx-postgrest        Up 18 seconds (healthy)
-postgres               Up 24 seconds (healthy)
-postgrest              Up 18 seconds
-redis                  Up 24 seconds (healthy)
-ui                     Up 6 seconds
-worker-anomaly         Up 6 seconds (healthy)
-worker-budget          Up 6 seconds (healthy)
-worker-cost-anomaly    Up 6 seconds (healthy)
-worker-intelligence    Up 6 seconds (healthy)
-worker-logs            Up 6 seconds (healthy)
-worker-webhook-retry   Up 7 seconds (healthy)
+engine                 Up 11 seconds (healthy)
+gotrue                 Up 16 seconds
+mailpit                Up 22 seconds (healthy)
+nginx-postgrest        Up 16 seconds (healthy)
+postgres               Up 22 seconds (healthy)
+postgrest              Up 16 seconds
+redis                  Up 22 seconds (healthy)
+ui                     Up 5 seconds
+worker-anomaly         Up 5 seconds (healthy)
+worker-budget          Up 5 seconds (healthy)
+worker-cost-anomaly    Up 5 seconds (healthy)
+worker-intelligence    Up 5 seconds (healthy)
+worker-logs            Up 5 seconds (healthy)
+worker-webhook-retry   Up 5 seconds (healthy)
 ```
 
 Fourteen services: the gateway (`engine`) and its six workers, the dashboard (`ui`), Postgres with PostgREST and GoTrue for data and sign-in, nginx in front of those two, Redis, and Mailpit, which catches the sign-in mail so that nothing is sent out. The diagram in the [README](../../README.md#architecture) shows how they connect.
@@ -60,7 +60,7 @@ curl -s localhost:8000/health
 **Expected output:**
 
 ```json
-{"status":"healthy","version":"1.0.5","timestamp":"2026-11-16T16:33:43.505862+00:00","redis":"healthy","supabase":"healthy"}
+{"status":"healthy","version":"1.0.6","timestamp":"2026-11-23T15:46:40.155879+00:00","redis":"healthy","supabase":"healthy"}
 ```
 
 ## 2. Sign in with a magic link
@@ -104,7 +104,7 @@ echo "${OXY_API_KEY:0:13}..."
 **Expected output:**
 
 ```
-oxy_live_5584...
+oxy_live_646a...
 ```
 
 One habit before the first request. A key written on curl's command line, in an `Authorization` header passed with `-H`, can be read by any user of the machine with `ps` while curl runs. Give curl the key on its standard input instead, through a small function you use for the rest of the lab:

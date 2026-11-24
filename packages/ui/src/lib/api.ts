@@ -102,6 +102,37 @@ export async function handleApiError(response: Response): Promise<string> {
 }
 
 /**
+ * What a 402 means to the person looking at the dashboard.
+ *
+ * The gateway answers 402 BUDGET_EXCEEDED when a project has spent its whole
+ * budget, and nothing resets a budget, so that notice says to raise it. Any
+ * other 402 is a plan or billing refusal (the optional billing module, the
+ * SSO add-on) and keeps the billing notice.
+ */
+export interface PaymentRequiredNotice {
+  title: string
+  description: string
+  billing: boolean
+}
+
+export function paymentRequiredNotice(body: unknown): PaymentRequiredNotice {
+  const error = (body as { error?: { code?: unknown } } | null)?.error
+  if (error && typeof error === 'object' && error.code === 'BUDGET_EXCEEDED') {
+    return {
+      title: 'Budget spent',
+      description:
+        "This project has spent its whole budget and nothing resets it. Raise the budget in the project's settings; until then its requests are refused.",
+      billing: false,
+    }
+  }
+  return {
+    title: 'Subscription Required',
+    description: 'Your subscription has expired or requires payment. Please update your billing.',
+    billing: true,
+  }
+}
+
+/**
  * Safe error message extractor for catch blocks
  * 
  * @param error - Unknown error from catch block

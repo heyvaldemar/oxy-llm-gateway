@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner"
 import { Header } from "@/components/header"
 import { ExportCSVButton } from "@/components/export-csv-button"
-import { authenticatedFetch, handleApiError as parseApiError } from '@/lib/api'
+import { authenticatedFetch, handleApiError as parseApiError, paymentRequiredNotice } from '@/lib/api'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,17 +180,19 @@ export default function DashboardPage() {
   // --- Helpers ---
 
   const handleApiError = useCallback(async (res: Response) => {
-    // Handle 402 Payment Required (subscription expired; Stripe deployments only)
+    // 402 Payment Required: a project that has spent its budget, or (Stripe
+    // deployments only) a subscription that needs attention. Say which.
     if (res.status === 402) {
-      toast.error('Subscription Required', {
-        description: 'Your subscription has expired or requires payment. Please update your billing.',
-        action: {
-          label: 'Update Billing',
-          onClick: () => router.push('/pricing')
-        },
+      const body = await res.clone().json().catch(() => null)
+      const notice = paymentRequiredNotice(body)
+      toast.error(notice.title, {
+        description: notice.description,
+        ...(notice.billing
+          ? { action: { label: 'Update Billing', onClick: () => router.push('/pricing') } }
+          : {}),
         duration: 15000, // Show for 15 seconds (important action)
       })
-      return 'Subscription required'
+      return notice.billing ? 'Subscription required' : 'Budget spent'
     }
 
     // 429 is a rate limit: calls came faster than allowed. No plan tier caps

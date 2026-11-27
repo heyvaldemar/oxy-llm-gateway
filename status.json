@@ -1,0 +1,140 @@
+{
+  "repository": "heyvaldemar/oxy-llm-gateway",
+  "workflow": "ci.yml",
+  "written_at": "2026-11-27T17:32:39Z",
+  "window_days": 30,
+  "days_with_runs": 13,
+  "green_days": 12,
+  "streak_days": 9,
+  "runs": 46,
+  "runs_passed": 43,
+  "latest": {
+    "conclusion": "success",
+    "at": "2026-11-27T15:35:51Z",
+    "url": "https://github.com/heyvaldemar/oxy-llm-gateway/actions/runs/46026315645",
+    "commit": "a758a78",
+    "checks_passed": 10,
+    "checks_failed": 0,
+    "checks": [
+      {
+        "state": "PASS",
+        "name": "Budget: 541 requests, 100 at a time, budget $0.05: provider served 35 (the budget buys 35), overspend $0; after the worker's sync cycles 0 of 20 served, after Redis lost the counter 0 of 20"
+      },
+      {
+        "state": "PASS",
+        "name": "DLP: 11 secret types sent, 0 reached the provider"
+      },
+      {
+        "state": "PASS",
+        "name": "Kill switch: 162 requests after the kill, 0 reached the provider; first blocked response 145 ms after the call"
+      },
+      {
+        "state": "PASS",
+        "name": "Tenancy: 25 requests with another tenant's agent and session ids: 25 refused, 0 reached the provider"
+      },
+      {
+        "state": "PASS",
+        "name": "Revocation: 10 requests with a cached key after revoking it: 10 refused, 0 reached the provider"
+      },
+      {
+        "state": "PASS",
+        "name": "Fail closed: Redis paused: 4 budgeted and 4 killed-session requests, 0 and 0 reached the provider"
+      },
+      {
+        "state": "PASS",
+        "name": "Surface: 27 database functions probed with the browser's keys, 0 callable; 41 tables, 0 without RLS; 0 policies open to the browser roles"
+      },
+      {
+        "state": "PASS",
+        "name": "Keys at rest: 10 tenant keys checked against every name and value of 54 Redis keys: 0 found"
+      },
+      {
+        "state": "PASS",
+        "name": "Audit: 824 requests sent (5 refused by the burst limit), 824 request_logs rows; a dashboard revoke kept 4 of the key's 4 rows"
+      },
+      {
+        "state": "PASS",
+        "name": "every proof shown its planted violation (proofs/plant_violations.py): 13 plants: 13 caught, 0 missed"
+      }
+    ],
+    "measured": [
+      "budget overspend: $0 (541 requests, 100 at a time, $0.05 budget)",
+      "secrets past DLP: 0 of 11",
+      "requests past the kill switch: 0 of 162 (first refusal 145 ms after the kill)",
+      "requests audited: 824 of 824"
+    ]
+  },
+  "proofs": {
+    "run_id": 46026315645,
+    "run_url": "https://github.com/heyvaldemar/oxy-llm-gateway/actions/runs/46026315645",
+    "at": "2026-11-27T15:35:51Z",
+    "commit": "a758a78",
+    "all_hold": true,
+    "budget": {
+      "holds": true,
+      "requests": 541,
+      "concurrent": 100,
+      "budget_usd": "0.05",
+      "served_by_provider": 35,
+      "max_affordable": 35,
+      "overspend_usd": "0",
+      "served_after_sync_cycles": 0,
+      "served_after_counter_lost": 0
+    },
+    "dlp": {
+      "holds": true,
+      "secret_types": 11,
+      "reached_provider": 0
+    },
+    "kill": {
+      "holds": true,
+      "requests_after_kill": 162,
+      "reached_provider_after_kill": 0,
+      "first_blocked_response_ms": 145,
+      "foreign_tenant_kill_status": 404
+    },
+    "tenancy": {
+      "holds": true,
+      "foreign_requests": 25,
+      "refused": 25,
+      "reached_provider": 0
+    },
+    "revoke": {
+      "holds": true,
+      "requests_after_revoke": 10,
+      "refused": 10,
+      "reached_provider": 0
+    },
+    "failclosed": {
+      "holds": true,
+      "redis_paused_seconds": 8.3,
+      "guarded_requests": 8,
+      "reached_provider": 0
+    },
+    "surface": {
+      "holds": true,
+      "functions_probed": 27,
+      "callable_by_browser_roles": 0,
+      "tables": 41,
+      "tables_without_rls": 0,
+      "policies_open_to_browser_roles": 0
+    },
+    "keys": {
+      "holds": true,
+      "tenant_keys_checked": 10,
+      "found_in_redis": 0
+    },
+    "audit": {
+      "holds": true,
+      "requests_sent": 824,
+      "request_log_rows": 824,
+      "rate_limited_requests": 5,
+      "revoke_rows_before": 4,
+      "revoke_rows_after": 4
+    },
+    "plants": {
+      "planted": 13,
+      "caught": 13
+    }
+  }
+}
